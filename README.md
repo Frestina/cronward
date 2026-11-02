@@ -135,7 +135,7 @@ laptop:
 cronward install --viewer homeserver   # anything you would type after ssh
 ```
 
-Every 15 minutes it reads the server's status over one ssh call (key files,
+Every hour it reads the server's status over one ssh call (key files,
 batch mode, no agent) and gives the same notices, plus:
 
 - **stopped ticking**: the server's last tick is over 30 minutes old;

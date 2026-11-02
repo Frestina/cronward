@@ -1,8 +1,8 @@
 """The systemd user timers.
 
 On the main machine, the tick: at minute 1 of every 5, and once at start
-after a missed time. On a viewer, the watch: every 15 minutes at :08, :23,
-:38 and :53. The viewer's minutes keep clear of Fleet's timers (fleetdoctor
+after a missed time. On a viewer, the watch: hourly at :08, soon enough for
+jobs that run daily. The minute keeps clear of Fleet's timers (fleetdoctor
 on the hour and at :02, :07, ...; fleetlog at :15, :45 and :50), so they
 never ssh into the same machine at once.
 
@@ -50,7 +50,7 @@ TICK = Timer("cronward-tick", "start and follow scheduled workflows", ("tick",),
 
 def watch_timer(host: str) -> Timer:
     return Timer("cronward-watch", f"notify about cronward on {host}", ("watch", host),
-                 ("OnCalendar=*:08/15", "AccuracySec=30s"), ("Nice=10", "TimeoutStartSec=2min"))
+                 ("OnCalendar=*:08", "AccuracySec=30s"), ("Nice=10", "TimeoutStartSec=2min"))
 
 
 NAMES = ("cronward-tick", "cronward-watch")

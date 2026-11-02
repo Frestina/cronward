@@ -66,5 +66,5 @@ class TimersTest(CronwardTest):
     def test_the_viewer_keeps_off_fleets_minutes(self):
         fleet = {0, 15, 45, 50} | set(range(2, 60, 5))
         line = next(s for s in timers.watch_timer("x").schedule if s.startswith("OnCalendar"))
-        first, step = map(int, re.search(r":(\d+)/(\d+)", line).groups())
-        self.assertFalse(set(range(first, 60, step)) & fleet)
+        self.assertEqual(line, "OnCalendar=*:08")
+        self.assertNotIn(int(re.search(r":(\d+)$", line).group(1)), fleet)
