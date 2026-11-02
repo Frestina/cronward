@@ -22,6 +22,7 @@ from pathlib import Path
 from unittest import mock
 
 from cronward import config, github, tick
+from cronward.config import Config
 
 BIN = Path(__file__).resolve().parent / "bin"
 REPO = "me/widget"
@@ -175,7 +176,7 @@ class CronwardTest(unittest.TestCase):
         sleep.start()
         self.addCleanup(sleep.stop)
 
-    def config(self, text: str = JOB) -> config.Config:
+    def config(self, text: str = JOB) -> Config:
         path = config.config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
@@ -184,7 +185,7 @@ class CronwardTest(unittest.TestCase):
     def make(self, account: str) -> github.Client:
         return github.Client("t0ken", self.gh)
 
-    def tick(self, cfg: config.Config, when: str | float, **kw) -> list[dict]:
+    def tick(self, cfg: Config, when: str | float, **kw) -> list[dict]:
         now = at(when) if isinstance(when, str) else when
         self.gh.clock = now
         return tick.run(cfg, self.make, now=now, **kw)
