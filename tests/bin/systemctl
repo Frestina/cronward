@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# A fake systemctl: records the call; `show --value` answers active.
+"$(dirname "$0")/record" systemctl "$@"
+for a in "$@"; do
+  if [[ $a == --value ]]; then
+    echo active
+  fi
+done

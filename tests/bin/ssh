@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# A fake ssh for tests. It records its arguments, then runs the remote
+# command here with HOME set to $CW_FAKE/homes/<target>, as real ssh would on
+# the far side. A target with no home is unreachable. While $CW_FAKE/offline
+# is there, this machine has no network.
+set -uo pipefail
+fake=${CW_FAKE:?fake ssh: CW_FAKE is not set}
+"$(dirname "$0")/record" ssh "$@"
+while (($#)) && [[ $1 != -- ]]; do
+  shift
+done
+target=$2
+shift 2
+if [[ -e $fake/offline ]]; then
+  echo "ssh: connect to host $target port 22: Network is unreachable" >&2
+  exit 255
+fi
+home=$fake/homes/$target
+if [[ ! -d $home ]]; then
+  echo "ssh: connect to host $target port 22: No route to host" >&2
+  exit 255
+fi
+cd "$home" || exit 255
+unset XDG_CONFIG_HOME XDG_STATE_HOME XDG_DATA_HOME
+HOME=$home exec bash -c "$*"

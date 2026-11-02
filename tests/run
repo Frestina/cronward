@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Runs the unit tests, then checks every shell script with bash -n and,
+# when it is installed, shellcheck. Exits non-zero if anything fails.
+set -uo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$root" || exit 1
+status=0
+
+python3 -m unittest discover -s tests -t . || status=1
+
+# Shell scripts, and the fakes in tests/bin (such as ssh), which have no .sh.
+mapfile -d '' scripts < <(find . -name .git -prune -o -type f \
+  \( -name '*.sh' -o -path './tests/bin/*' \) -print0)
+scripts+=(./tests/run)
+
+for f in "${scripts[@]}"; do
+  bash -n "$f" || status=1
+done
+
+if command -v shellcheck >/dev/null; then
+  shellcheck -s bash "${scripts[@]}" || status=1
+else
+  echo "shellcheck not installed, skipped" >&2
+fi
+
+if ((status == 0)); then
+  echo "all passed"
+else
+  echo "FAILED" >&2
+fi
+exit "$status"

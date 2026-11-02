@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# A fake loginctl: records the call and answers $CW_LINGER (default yes).
+"$(dirname "$0")/record" loginctl "$@"
+echo "${CW_LINGER:-yes}"

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# A fake systemd-creds: "encrypts" by writing FAKECRED, the --name, and the
+# text reversed, and decrypts only with the same --name. With
+# $CW_CREDS=fail it fails to encrypt.
+set -uo pipefail
+"$(dirname "$0")/record" systemd-creds "$@"
+args=()
+name=""
+for a in "$@"; do
+  case $a in
+    --user) ;;
+    --name=*) name=${a#--name=} ;;
+    *) args+=("$a") ;;
+  esac
+done
+case ${args[0]} in
+  encrypt)
+    if [[ ${CW_CREDS:-ok} == fail ]]; then
+      echo "Failed to determine local credential key" >&2
+      exit 1
+    fi
+    { echo "FAKECRED $name"; rev; } >"${args[2]}"
+    ;;
+  decrypt)
+    { read -r magic stored && [[ $magic == FAKECRED && $stored == "$name" ]] &&
+      rev; } <"${args[1]}" || { echo "Credential name mismatch" >&2; exit 1; }
+    ;;
+esac

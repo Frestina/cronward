@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# A fake notify-send: records the call. With $CW_NOTIFY=fail it fails, as
+# with no notification daemon.
+"$(dirname "$0")/record" notify-send "$@"
+if [[ ${CW_NOTIFY:-ok} == fail ]]; then
+  echo "Failed to connect to the notification daemon" >&2
+  exit 1
+fi
