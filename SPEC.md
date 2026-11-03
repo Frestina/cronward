@@ -112,7 +112,13 @@ GitHub, and stores it under `~/.local/share/cronward/tokens/`
 (`$XDG_DATA_HOME`), never in the config, which people often put in their
 dotfiles. With `systemd-creds` (systemd 256 or newer) it is encrypted with
 `--user`, bound to this machine and user. Without it, it is a plain file
-only the user can read, and `doctor` says so.
+only the user can read, in a folder only the user can open, never readable
+by others even for a moment. That is the case on Ubuntu 24.04 and Debian
+12, likely home servers, so it is said loudly: the README says it before
+the install, `token set` prints a warning with the reason (such as the
+systemd version) and what to do, and `doctor` warns on every run while a
+token is a plain file. A token is never refused for being plain: on those
+systems cronward would not work at all.
 
 GitHub sends a token's expiry date with every answer. cronward keeps it and
 warns once a day from 14 days before. A refused token makes the job's slot

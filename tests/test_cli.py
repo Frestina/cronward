@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
@@ -34,6 +35,19 @@ class CliTest(CronwardTest):
         self.assertNotIn("github_pat_secret", out + err)
         self.assertEqual(tokens.load("personal"), "github_pat_secret")
         self.assertEqual(self.gh.calls[0][1], "/user")
+        self.assertNotIn("WARNING", out + err)
+
+    def test_token_set_warns_loudly_when_it_cannot_encrypt(self):
+        self.config()
+        with mock.patch.dict(os.environ, {"CW_SYSTEMD": "255"}):
+            rc, out, err = self.run_cli("token", "set", "personal", stdin="github_pat_x\n")
+            self.assertEqual(rc, 0, err)
+            self.assertIn("not encrypted", out)
+            self.assertIn("WARNING: the token for personal is NOT encrypted: this machine has "
+                          "systemd 255, and encryption needs 256 or newer.", err)
+            rc, out, _ = self.run_cli("doctor")
+        self.assertIn("warn  account personal: the token is NOT encrypted (this machine has "
+                      "systemd 255", out)
 
     def test_token_set_replaces_the_old_tokens_expiry(self):
         self.config()

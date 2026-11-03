@@ -132,7 +132,7 @@ def cmd_token(action: str, account: str) -> int:
         print(f"cronward: cannot check the token: {notify.clean(e)}; nothing stored",
               file=sys.stderr)
         return EXIT_ERROR
-    how = tokens.store(account, token)
+    how, why = tokens.store(account, token)
     if state.path().exists():
         # The old token's expiry would otherwise warn until a tick reaches GitHub.
         with state.locked(wait=True):
@@ -141,6 +141,8 @@ def cmd_token(action: str, account: str) -> int:
             state.save(data)
     print(f"stored the token of GitHub user {login} for {account}, {how}")
     print(f"expires: {client.expires or 'never'}")
+    if why:
+        print(tokens.warning(account, notify.clean(why)), file=sys.stderr)
     if token.startswith("ghp_") or token.startswith("gho_"):
         print("note: this is not a fine-grained token; one limited to Actions: read and write "
               "on the repos of your jobs is safer")

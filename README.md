@@ -38,6 +38,13 @@ fine-grained token per account that can only start and read workflows.
 
 Needs Linux with systemd and Python 3.11 or newer. Nothing else.
 
+> **Tokens are only encrypted with systemd 256 or newer**: Debian 13,
+> Ubuntu 24.10, Fedora 41, Arch, or later. On older systems, such as
+> Ubuntu 24.04 LTS and Debian 12, cronward works, but keeps each token as a
+> plain file only you can read, and anything that can read your files can
+> use it. `cronward token set` and `cronward doctor` warn about it. Check
+> with `systemctl --version`.
+
 ```sh
 git clone https://github.com/Frestina/cronward ~/Projects/cronward
 ~/Projects/cronward/install.sh   # links cronward into ~/.local/bin, and the agent skill
@@ -56,8 +63,9 @@ Fine-grained tokens, Generate new token**.
   Nothing else; GitHub adds Metadata: read itself.
 
 Then store it. It is read from stdin, checked with GitHub, and encrypted with
-`systemd-creds` for your user on this machine (a file only you can read if
-`systemd-creds` is missing). It never goes in the config.
+`systemd-creds` for your user on this machine. Before systemd 256 it is a
+plain file only you can read instead, and `token set` warns you. It never
+goes in the config.
 
 ```sh
 cronward token set personal
@@ -200,7 +208,7 @@ when the run did not pass, for scripts.
 | | |
 | --- | --- |
 | `~/.config/cronward/config.toml` | the config |
-| `~/.local/share/cronward/tokens/` | the tokens, encrypted |
+| `~/.local/share/cronward/tokens/` | the tokens, encrypted from systemd 256 |
 | `~/.local/state/cronward/state.json` | claims, run IDs, the last 50 results of each job |
 | `~/.local/state/cronward/status.json` | what `status --json` shows, written every tick |
 
@@ -211,6 +219,11 @@ The `XDG_*_HOME` variables move them. [SPEC.md](SPEC.md) has every rule.
 - **What the token can do**: start and read workflow runs, and turn
   workflows on and off, in the repos you picked. It cannot read your code,
   push, or see other repos.
+- **Where the token is kept**: encrypted with `systemd-creds`, so only
+  your user on this machine can decrypt it. Before systemd 256 (Ubuntu
+  24.04, Debian 12) it is a plain file only you can read: a backup of your
+  home, or any program running as you, has it. Keep the token narrow and
+  give it an expiry date.
 - **What cronward does with it**: starts runs, reads them, and turns on a
   workflow GitHub turned off for inactivity (unless `reenable = false`).
 - **Where it talks**: only `https://api.github.com`, fixed in the code; a
