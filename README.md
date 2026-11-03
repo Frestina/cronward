@@ -173,9 +173,18 @@ on.
 
 ## With an agent
 
-The repo has an Agent Skill, [skills/cronward](skills/cronward/SKILL.md),
-that `install.sh` links into `~/.agents/skills` and `~/.claude/skills` when
-those folders are there. Then you can ask the agent working in a repo to
+The repo has an Agent Skill, [skills/cronward](skills/cronward/SKILL.md).
+In Claude Code, install it as a plugin:
+
+```
+/plugin install cronward --marketplace Frestina/cronward
+```
+
+For other agents, `install.sh` links it into `~/.agents/skills`, and into
+`~/.claude/skills` unless the plugin is installed. The plugin is only the
+skill: the `cronward` command still comes from the install above, on the
+machine that runs it, and on a laptop the skill reaches that machine over
+ssh. Then you can ask the agent working in a repo to
 "put check.yml on cronward, daily at 06:00". It adds `workflow_dispatch:`,
 runs `cronward add`, tests the job with `cronward run --wait`, and takes out
 the workflow's `schedule:` once a run has passed. It works over ssh when

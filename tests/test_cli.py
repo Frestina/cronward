@@ -3,6 +3,7 @@ import json
 import os
 import time
 from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
 from unittest import mock
 
 from cronward import __version__, cli, config, state, tokens
@@ -143,6 +144,13 @@ class CliTest(CronwardTest):
             cli.main(["--version"])
         self.assertEqual(e.exception.code, 0)
         self.assertEqual(out.getvalue(), f"cronward {__version__}\n")
+
+    def test_the_plugin_has_the_same_version(self):
+        root = Path(__file__).resolve().parent.parent
+        plugin = json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+        self.assertEqual(plugin["version"], __version__)
+        for skill in plugin["skills"]:
+            self.assertTrue((root / skill / "SKILL.md").is_file(), skill)
 
     def test_doctor(self):
         self.config()
