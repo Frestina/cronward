@@ -2,6 +2,8 @@
 
 <p align="center">Runs your GitHub Actions workflows on schedule from a Linux machine you own, and tells you whether they passed.</p>
 
+<p align="center"><img src="docs/demo/demo.svg" alt="A terminal: cronward add puts me/widget's check.yml on a daily schedule, cronward run nightly --wait starts it and says it passed, and cronward status shows the result and the next slot."></p>
+
 GitHub's `on: schedule` is unreliable. Runs start late, sometimes by hours,
 or never: some repos never get a scheduled run at all, while "Run workflow"
 by hand works every time. cronward is the usual workaround done properly. A
