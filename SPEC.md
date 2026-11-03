@@ -184,7 +184,8 @@ Then, for every pending result:
 
 `cronward tick --dry-run` prints what is due and why, and changes nothing.
 `cronward run <job>` starts a job now, outside its schedule, recorded as a
-manual slot. It waits for a tick that holds the lock to finish. With `--wait [TIME]` it follows the run to its end, for at most
+manual slot. It waits for a tick that holds the lock to finish, and says it
+is waiting. With `--wait [TIME]` it follows the run to its end, for at most
 TIME or the job's `finish_within`, gives the notice a tick would, and exits
 0 only if the run passed. A run still going at the limit is left to the
 ticks.
