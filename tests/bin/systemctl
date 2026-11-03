@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# A fake systemctl: records the call; `show --value` answers active.
+# A fake systemctl: records the call; `show --value` answers active. With
+# $CW_SYSTEMCTL=nobus it fails as with no user manager.
 "$(dirname "$0")/record" systemctl "$@"
+if [[ ${CW_SYSTEMCTL:-} == nobus ]]; then
+  echo "Failed to connect to bus: No medium found" >&2
+  exit 1
+fi
 for a in "$@"; do
   if [[ $a == --value ]]; then
     echo active

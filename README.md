@@ -63,7 +63,11 @@ enough.
 
 ## Install
 
-Needs Linux with systemd and Python 3.11 or newer. Nothing else.
+Needs Linux with systemd and Python 3.11 or newer. Nothing else. Tried on
+Arch, Debian 12 and Ubuntu 24.04. Ubuntu 22.04 has Python 3.10, too old
+(its `python3.11` package is a release candidate). On RHEL 9 and its kin,
+`dnf install python3.11` and run cronward with it: `python3.11
+~/.local/bin/cronward install` makes the timer use it too.
 
 > **Tokens are only encrypted with systemd 256 or newer**: Debian 13,
 > Ubuntu 24.10, Fedora 41, Arch, or later. On older systems, such as

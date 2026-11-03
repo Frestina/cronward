@@ -273,10 +273,17 @@ commit as the commands it describes.
 
 ## Requirements
 
-Python 3.11 or newer, standard library only. Linux with systemd user
-timers, and a user manager that keeps running: lingering, or an autologin
-session. `install` and `doctor` say when neither is there, and never turn
-lingering on themselves. The services run at low priority (Nice, idle IO, a
+Python 3.11 or newer, standard library only; with an older one,
+`bin/cronward` says so in one line. Linux with systemd user timers, and a
+user manager that keeps running: lingering, or an autologin session.
+`install` and `doctor` say when neither is there, and when the user manager
+cannot be reached at all, and never turn lingering on themselves. CI runs
+the tests on Debian 12 and Ubuntu 24.04 with their own Python, and checks
+the one line on Ubuntu 22.04.
+
+`doctor` warns when notices from the machine reach no one: no notify-send
+(as on a server) or desktop off, and no `notify.command`. That is fine when
+a viewer watches the machine, which the machine cannot know. The services run at low priority (Nice, idle IO, a
 memory and time limit), so they don't disturb other work on the machine.
 
 ## Versions
