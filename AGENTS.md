@@ -17,6 +17,8 @@ behaviour, and change it in the same commit when a decision changes.
 - `cronward/notify.py`: when to give a notice, giving it, and the viewer.
 - `cronward/status.py`: `status` and status.json.
 - `cronward/doctor.py`, `cronward/timers.py`: `doctor`, and the systemd units.
+- `skills/cronward/SKILL.md`: the skill for agents in other repos. Keep it in
+  step with the commands it uses.
 - `tests/`: `./tests/run` runs everything. `tests/harness.py` gives each
   test a throwaway home and a FakeGitHub transport; `tests/bin` holds fakes
   (notify-send, systemctl, loginctl, systemd-creds, ssh) that record calls.

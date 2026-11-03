@@ -4,9 +4,14 @@ The config is ~/.config/cronward/config.toml ($XDG_CONFIG_HOME), described in
 SPEC.md and in TEMPLATE, which `cronward init` writes. Unknown keys are
 errors, so a typo is caught instead of quietly ignored. A config with no
 jobs is fine: a viewer needs none.
+
+`cronward add` and `remove` change the file's text, not a parsed copy, so
+comments stay. Every change is read back before it is saved.
 """
 
+import dataclasses
 import datetime
+import json
 import os
 import re
 import shlex
@@ -290,3 +295,70 @@ def load(required: bool = True) -> Config:
     except OSError as e:
         raise ConfigError(f"cannot read {path}: {e.strerror}") from None
     return parse(text, str(path))
+
+
+def _toml(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{_toml(k)} = {_toml(v)}" for k, v in value.items()) + " }"
+    return json.dumps(str(value), ensure_ascii=False)  # a TOML basic string
+
+
+def with_job(text: str, name: str, settings: dict[str, object]) -> str:
+    """The config text with [jobs.<name>] added at the end, read back first."""
+    if not NAME.fullmatch(name):
+        raise ConfigError(f"{name!r} is not a job name: letters, digits, '.', '_' and '-'")
+    block = "\n".join([f"[jobs.{name}]", *(f"{k} = {_toml(v)}" for k, v in settings.items())])
+    new = (text.rstrip("\n") + "\n\n" if text.strip() else "") + block + "\n"
+    if name not in {j.name for j in parse(new).jobs}:
+        raise ConfigError(f"[jobs.{name}] does not read back from the config; add it by hand")
+    return new
+
+
+def _comparable(cfg: Config) -> Config:
+    # A zone read from /etc/localtime is a new object each time.
+    return dataclasses.replace(cfg, jobs=tuple(dataclasses.replace(j, zone=None)
+                                                for j in cfg.jobs))
+
+
+def without_job(text: str, name: str) -> str:
+    """The config text with [jobs.<name>] taken out, up to the next table.
+    Comments right above the next table stay with it. Refused unless the
+    rest of the config reads exactly as before."""
+    lines = text.splitlines(keepends=True)
+    quoted = re.escape(name)
+    header = re.compile(rf'\s*\[\s*jobs\s*\.\s*(?:{quoted}|"{quoted}")\s*\]\s*(?:#.*)?$')
+    starts = [i for i, line in enumerate(lines) if header.match(line)]
+    if len(starts) != 1:
+        raise ConfigError(f"cannot find one [jobs.{name}] in the config; take it out by hand")
+    start = starts[0]
+    end = start + 1
+    while end < len(lines) and not lines[end].lstrip().startswith("["):
+        end += 1
+    while end > start + 1 and (not lines[end - 1].strip()
+                               or lines[end - 1].lstrip().startswith("#")):
+        end -= 1
+    while start > 0 and not lines[start - 1].strip():
+        start -= 1
+    new = "".join(lines[:start] + lines[end:])
+    before = parse(text)
+    want = dataclasses.replace(before, jobs=tuple(j for j in before.jobs if j.name != name))
+    try:
+        same = _comparable(parse(new)) == _comparable(want)
+    except ConfigError:
+        same = False
+    if not same:
+        raise ConfigError(f"taking out [jobs.{name}] would change more of the config; take it "
+                          "out by hand")
+    return new
+
+
+def save(text: str) -> None:
+    """Replaces the config atomically. Writes through a symlink, so a config
+    kept in a dotfiles repo stays there."""
+    real = config_path().resolve()
+    tmp = real.with_name(f".{real.name}.tmp")
+    tmp.write_text(text)
+    os.chmod(tmp, real.stat().st_mode & 0o7777)
+    os.replace(tmp, real)
