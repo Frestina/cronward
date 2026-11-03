@@ -34,6 +34,33 @@ The runs still happen on GitHub's machines. cronward is not a runner and
 never runs code from a repo. It talks only to `api.github.com`, with a
 fine-grained token per account that can only start and read workflows.
 
+## Why not a crontab line with curl
+
+You can: `curl -X POST .../dispatches` from cron, or a hosted cron service
+(cron-job.org, a Cloudflare Worker, EventBridge) calling the same URL. That
+starts the run. It doesn't tell you how the run went, and it fails quietly:
+
+- **Did it run?** A refused start, an expired token or a turned-off workflow
+  is a line in a log nobody reads. cronward follows each run to its end, and
+  a check that didn't run is told as didn't run, never as nothing.
+- **Twice, or not at all.** A request that times out may still have reached
+  GitHub. Sending it again can start the run twice; not sending it can lose
+  it. cronward saves its claim on a slot before starting it, and after an
+  unclear answer looks for the run instead of sending another.
+- **The machine was off.** cron skips those slots without a word. cronward
+  runs the latest one once when it is back, and reports the others as
+  missed.
+- **Where the token lives.** A hosted service holds a token that can start
+  your workflows. cronward keeps it on your machine (encrypted from
+  systemd 256), and talks only to `api.github.com`.
+- **Someone has to look.** cronward gives one notice when a job's result
+  changes, and a viewer on your laptop tells you when the server itself
+  stopped.
+
+If a late or missing run is fine, keep GitHub's `on: schedule`. If you only
+need the start and will look at the Actions tab yourself, the curl line is
+enough.
+
 ## Install
 
 Needs Linux with systemd and Python 3.11 or newer. Nothing else.
