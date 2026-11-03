@@ -37,10 +37,11 @@ Jobs live on the main machine, which holds the config and the tokens. Run
    `PATH`).
 2. Otherwise, if `systemctl --user cat cronward-watch.service` succeeds, this
    machine is a viewer, and its `ExecStart=` line ends with `watch <host>`.
-   Run each command over ssh, quoting it as one argument:
-   `ssh -o BatchMode=yes <host> '~/.local/bin/cronward status'`. If ssh
-   fails (no key, a passphrase), ask the user to run the commands, or to
-   make ssh to `<host>` work for you.
+   Run each command there by putting `--on <host>` first:
+   `cronward --on <host> status`. It runs cronward over the user's ssh and
+   passes the exit code through; 2 with "ssh failed" means ssh could not
+   log in (no key, a passphrase). Then ask the user to run the commands, or
+   to make ssh to `<host>` work for you.
 3. Otherwise cronward is not set up for this user. Tell them, point them to
    the install steps in cronward's README, and stop.
 

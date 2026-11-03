@@ -217,6 +217,55 @@ class CliTest(CronwardTest):
         self.assertEqual(rc, 0)
         self.assertIn(f"{REPO}  check.yml  Check  (active)", out)
 
+    def test_workflows_marks_jobs_and_has_json(self):
+        self.config(JOB + "\n[accounts.work]\n")
+        tokens.store("personal", "t0ken")
+        self.gh.workflows[(REPO, "other.yml")] = {
+            "id": 8, "name": "Other", "state": "disabled_manually",
+            "path": ".github/workflows/other.yml"}
+        rc, out, err = self.run_cli("workflows")
+        self.assertEqual(rc, 2)  # no token for work
+        self.assertIn(f"personal: {REPO}  check.yml  Check  (active, job check)", out)
+        self.assertIn(f"personal: {REPO}  other.yml  Other  (disabled_manually)", out)
+        self.assertIn("work: ", err)
+        rc, out, _ = self.run_cli("workflows", "--json")
+        self.assertEqual(rc, 2)
+        personal, work = json.loads(out)["accounts"]
+        self.assertEqual(personal["error"], None)
+        self.assertEqual(personal["repos"], [{"repo": REPO, "error": None, "workflows": [
+            {"file": "check.yml", "id": 7, "name": "Check", "state": "active",
+             "jobs": ["check"]},
+            {"file": "other.yml", "id": 8, "name": "Other", "state": "disabled_manually",
+             "jobs": []}]}])
+        self.assertEqual((work["account"], work["repos"]), ("work", []))
+        self.assertTrue(work["error"])
+        rc, out, _ = self.run_cli("workflows", "personal", "--json")
+        self.assertEqual(rc, 0)
+        self.assertEqual([a["account"] for a in json.loads(out)["accounts"]], ["personal"])
+
+    def test_workflows_with_no_account_needs_a_config(self):
+        rc, _, err = self.run_cli("workflows")
+        self.assertEqual(rc, 2)
+        self.assertIn("no config", err)
+
+    def test_edit_opens_the_editor_then_checks(self):
+        self.config()
+        with mock.patch.dict(os.environ, {"EDITOR": "sed -i 's/0 6 \\* \\* \\*/0 7 * * */'",
+                                          "VISUAL": ""}):
+            rc, out, err = self.run_cli("edit")
+        self.assertEqual(rc, 0, err)
+        self.assertIn("reads: 1 accounts, 1 jobs", out)
+        self.assertIn('schedule = "0 7 * * *"', config.config_path().read_text())
+        with mock.patch.dict(os.environ, {"VISUAL": "sed -i s/account/acount/"}):
+            rc, out, err = self.run_cli("edit")
+        self.assertEqual(rc, 2)
+        self.assertIn("the config does not read now", err)
+
+    def test_edit_needs_a_config(self):
+        rc, _, err = self.run_cli("edit")
+        self.assertEqual(rc, 2)
+        self.assertIn("cronward init", err)
+
     def test_dry_run(self):
         self.config()
         rc, out, _ = self.run_cli("tick", "--dry-run")

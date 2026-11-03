@@ -18,6 +18,7 @@ import json
 import os
 import re
 import shlex
+import sys
 import tomllib
 import zoneinfo
 from collections.abc import Iterator
@@ -365,7 +366,12 @@ def editing() -> Iterator[None]:
     state folder, as the config's folder may be a dotfiles repo."""
     state_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
     with open(state_dir() / "config-lock", "w") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("waiting for another cronward (add, remove or edit) to finish with the "
+                  "config", file=sys.stderr, flush=True)
+            fcntl.flock(f, fcntl.LOCK_EX)
         yield
 
 
