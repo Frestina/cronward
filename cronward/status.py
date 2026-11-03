@@ -18,7 +18,7 @@ from cronward.config import Config
 from cronward.state import PASSED, WORDS
 
 SCHEMA = 1
-RECENT = 10
+RECENT = 20  # a viewer reads hourly, and a */5 job has 12 results an hour
 SOON = 14 * 86400
 STALE = 30 * 60  # a main machine whose last tick is older has stopped
 

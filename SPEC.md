@@ -42,8 +42,9 @@ Only `success` is passed. Nothing unknown is ever shown as passed.
 1. **A run that didn't happen looks like a pass.** Only a run cronward
    started for that slot, ended `success`, is passed.
 2. **A slot runs twice.** The claim of a slot is saved before its run is
-   started. A tick that dies after that loses the slot, which is reported
-   as didn't run, and never starts it again.
+   started. A tick that dies after that never starts the slot again: the
+   next tick looks for a run GitHub may have started for it, and otherwise
+   reports it as didn't run.
 3. **Code from a repo runs on the machine.** cronward starts runs on
    GitHub's machines. It is not a runner and runs nothing from a repo.
 4. **cronward talks to a host other than api.github.com.** The address is
@@ -126,7 +127,8 @@ For each enabled job:
    the latest one runs. The others are recorded as one didn't run result,
    "missed N slots from A to B".
 3. **The claim.** `through` moves to now and the slot is recorded as
-   pending. The state is saved before anything is started.
+   pending. The state is saved before anything is started. `through` never
+   moves back, so a clock that is set back claims no slot a second time.
 
 Then, for each claimed slot:
 
@@ -179,6 +181,10 @@ result of a new job makes no notice.
   list) is run with the notice as JSON on stdin, such as a script that posts
   to ntfy. cronward itself never talks to that host.
 
+A tick that fails (a config or state that does not read, or anything
+unexpected) gives one notice for each new error. The next tick that works
+resets it, so the same error coming back is told again.
+
 GitHub may also email the token's account when a run it started fails.
 cronward does not depend on that.
 
@@ -218,8 +224,9 @@ The minute keeps clear of Fleet's timers (fleetdoctor on the hour and at
 | `cronward install [--viewer <host>]` | The user timer, on the main machine or a viewer |
 | `cronward uninstall` | Remove the timers; config, tokens and state stay |
 
-Exit codes: 0 fine, 1 a job's latest result is not passed (status), or a
-check failed (doctor), 2 an error.
+Exit codes: 0 fine, 1 a job's latest result is not passed (status), the
+start did not go through (run), a check failed (doctor), or the main
+machine was not reached (watch), 2 an error.
 
 ## Requirements
 

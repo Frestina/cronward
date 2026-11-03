@@ -47,6 +47,15 @@ class StartTest(CronwardTest):
         self.tick(cfg, "2026-11-03 06:01")
         self.assertEqual(seen, [(at("2026-11-03 06:01"), [state.PENDING])])
 
+    def test_a_clock_stepped_back_does_not_run_a_slot_again(self):
+        cfg = self.config()
+        self.tick(cfg, "2026-11-03 05:56")
+        self.tick(cfg, "2026-11-03 06:31")  # the clock is ahead
+        self.tick(cfg, "2026-11-03 05:36")  # and is put right
+        self.tick(cfg, "2026-11-03 06:01")
+        self.tick(cfg, "2026-11-03 06:36")
+        self.assertEqual(len(self.gh.calls_to("POST", "/dispatches")), 1)
+
     def test_missed_slots_are_one_result_and_only_the_latest_runs(self):
         cfg = self.config()
         self.tick(cfg, "2026-11-01 05:56")
@@ -297,6 +306,24 @@ class NoticeTest(CronwardTest):
         self.assertEqual([n["kind"] for n in tick_notices], ["token"])
         again = tick.run(cfg, lambda a: _NoCall(), now=at("2026-11-03 05:30"))
         self.assertEqual(again, [])
+
+    def test_a_token_with_no_expiry_ends_the_warnings(self):
+        cfg = self.config()
+        self.tick(cfg, "2026-11-03 05:56")
+        with state.locked():
+            data = state.load()
+            data["accounts"]["personal"] = {"expires": "2026-11-01 00:00:00 UTC"}
+            state.save(data)
+        answer = self.gh._answer
+
+        def no_expiry(*args):
+            code, hdrs, body = answer(*args)
+            return code, {}, body
+        self.gh._answer = no_expiry
+        self.tick(cfg, "2026-11-03 06:01")
+        self.assertIsNone(state.load()["accounts"]["personal"]["expires"])
+        self.gh.finish(1001, "success")
+        self.assertEqual(self.tick(cfg, "2026-11-04 05:01"), [])
 
     def test_status_json_is_written_every_tick(self):
         cfg = self.config()

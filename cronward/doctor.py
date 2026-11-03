@@ -10,6 +10,7 @@ import time
 from cronward import config, cron, state, status, timers, tokens
 from cronward.config import ConfigError
 from cronward.github import GitHubError, HTTPProblem
+from cronward.notify import clean
 from cronward.tick import MakeClient, default_client, explain, when
 
 
@@ -18,14 +19,14 @@ class Report:
         self.failed = 0
 
     def ok(self, text: str) -> None:
-        print(f"ok    {text}")
+        print(f"ok    {clean(text)}")
 
     def warn(self, text: str) -> None:
-        print(f"warn  {text}")
+        print(f"warn  {clean(text)}")
 
     def fail(self, text: str) -> None:
         self.failed += 1
-        print(f"FAIL  {text}")
+        print(f"FAIL  {clean(text)}")
 
 
 def run(make: MakeClient = default_client) -> int:

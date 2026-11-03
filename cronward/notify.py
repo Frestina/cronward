@@ -4,7 +4,8 @@ A job gets a notice when its results change kind, taken in the order they
 became final: to failed or didn't run, or back to passed after one of
 those. A job's first result gives one only when it is not passed. A
 workflow cronward turned back on always gives one, and so does a token that
-expires within 14 days, once a day.
+expires within 14 days, once a day. A tick that fails gives one for each new
+error (tick.failed).
 
 A notice goes to notify-send and to notify.command, which gets it as JSON
 on stdin. Neither can fail a tick: what goes wrong is printed, and the
@@ -45,18 +46,14 @@ def clean(text: object) -> str:
     return _CONTROL.sub("", str(text))
 
 
-def _when(ts: float) -> str:
-    return datetime.datetime.fromtimestamp(ts).strftime("%b %-d %H:%M")
-
-
 def _result_notice(rec: dict, job: dict | None, prev: str | None) -> dict:
     kind = rec["kind"]
     name = rec["job"]
     title = (f"cronward: {name} passes again" if kind == PASSED
              else f"cronward: {name} {WORDS[kind]}")
     where = f"{job['repo']} {job['workflow']}" if job else name
-    slot = (f"started by hand {_when(rec['slot'])}" if rec.get("manual")
-            else f"slot {_when(rec['slot'])}")
+    slot = (f"started by hand {status.when(rec['slot'])}" if rec.get("manual")
+            else f"slot {status.when(rec['slot'])}")
     body = f"{where}, {slot}" + (f": {rec['reason']}" if rec["reason"] else "")
     if rec.get("url"):
         body += f"\n{rec['url']}"
@@ -182,8 +179,7 @@ def _load_viewer(host: str) -> dict | None:
 
 def watch(host: str, cfg: Config, now: float | None = None) -> int:
     now = time.time() if now is None else now
-    seen_before = _load_viewer(host)
-    v = seen_before or {"notified": {}, "seen": {}}
+    v = _load_viewer(host) or {"notified": {}, "seen": {}}
     v.setdefault("notified", {})
     v.setdefault("seen", {})
     notices: list[dict] = []
@@ -208,13 +204,17 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
         notices.append({"title": f"cronward: {host} is reachable again", "body": "",
                         "kind": "host"})
     v.pop("unreachable_since", None)
+    # Files from before "contacted" have seen jobs; one that only ever
+    # failed to reach the host has none.
+    first = not v.pop("contacted", bool(v["seen"]))
+    v["contacted"] = True
 
     tick = st.get("last_tick")
     stale = not isinstance(tick, (int, float)) or now - tick > status.STALE
     if stale and not v.get("stale_said"):
         v["stale_said"] = True
         notices.append({"title": f"cronward on {host} has stopped ticking",
-                        "body": f"Last tick: {_when(tick) if tick else 'never'}. Check "
+                        "body": f"Last tick: {status.when(tick) if tick else 'never'}. Check "
                                 f"`cronward doctor` there.", "kind": "host"})
     elif not stale and v.pop("stale_said", False):
         notices.append({"title": f"cronward on {host} is ticking again", "body": "",
@@ -230,7 +230,7 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
     for name, j in jobs.items():
         final = [r for r in j.get("recent", []) if r.get("kind") != state.PENDING]
         keys = [f"{r['slot']}" for r in final]
-        if seen_before is None:
+        if first:
             finished += final[-1:]
         else:
             old = set(v["seen"].get(name, []))

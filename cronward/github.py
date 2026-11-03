@@ -11,6 +11,7 @@ that may have happened must never be sent again:
 - HTTPProblem: GitHub answered with an error status.
 """
 
+import http.client
 import json
 import socket
 import ssl
@@ -87,7 +88,7 @@ def urllib_transport(method: str, path: str, body: bytes | None,
         raise NoAnswer(f"no answer from {HOST}: {reason}") from None
     except (TimeoutError, socket.timeout):
         raise NoAnswer(f"no answer from {HOST} in {TIMEOUT}s") from None
-    except (ConnectionError, OSError) as e:
+    except (ConnectionError, OSError, http.client.HTTPException) as e:
         raise NoAnswer(f"the connection to {HOST} broke: {e}") from None
 
 
@@ -107,6 +108,7 @@ class Client:
         self._transport = transport or urllib_transport
         self.sleep = sleep
         self.expires: str | None = None  # as GitHub sends it, "2026-12-01 00:00:00 UTC"
+        self.answered = False  # a call succeeded, so expires None means none
 
     def call(self, method: str, path: str, body: dict | None = None):
         headers = {
@@ -120,8 +122,9 @@ class Client:
             data = json.dumps(body).encode()
             headers["Content-Type"] = "application/json"
         status, hdrs, raw = self._transport(method, path, data, headers)
-        if hdrs.get(EXPIRY):
-            self.expires = hdrs[EXPIRY]
+        if status < 400:
+            self.answered = True
+            self.expires = hdrs.get(EXPIRY) or None
         try:
             parsed = json.loads(raw) if raw.strip() else None
         except ValueError:
