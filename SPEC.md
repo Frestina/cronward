@@ -238,6 +238,21 @@ The viewer keeps its own record of what it has said, and says:
 The minute keeps clear of the hour and the quarter hours, where other
 timers crowd, so they don't ssh into the same machine at once.
 
+The viewer keeps what it fetched as `status-<host>.json` in its state
+folder (written atomically, the same schema), and records in its own file
+when it last fetched, and the last error and since when.
+`cronward status --host <host>` shows that copy, and talks to nothing:
+with `--json`, it is status.json plus a `viewer` object,
+`{"host", "fetched", "error", "offline", "unreachable_since",
+"stopped_ticking"}`, so a reader such as a bar widget can tell a fresh copy
+from an old one, and this machine offline from the main machine out of
+reach. Stopped ticking is judged at the time of the fetch: the main
+machine's last tick was more than 30 minutes before it. Text mode says
+"as of <time>, from <host>", and when it applies "cannot reach <host> since
+<time>" or "<host> has stopped ticking". It exits 1 when a job's latest
+result is not passed, the main machine cannot be reached or has stopped
+ticking, and 2 when there is no copy yet.
+
 ## Commands
 
 | Command | |
@@ -250,6 +265,7 @@ timers crowd, so they don't ssh into the same machine at once.
 | `cronward remove <job>` | Take a job out of the config |
 | `cronward doctor` | Check config, tokens, repos, workflows, timer and lingering |
 | `cronward status [--json]` | Each job's latest result and next slot, and the last tick |
+| `cronward status --host <host> [--json]` | The same, as a viewer last fetched it from the main machine |
 | `cronward run <job> [--wait [TIME]]` | Start a job now, and with `--wait`, say how it went |
 | `cronward tick [--dry-run]` | What the timer runs |
 | `cronward watch <host>` | What a viewer's timer runs |
@@ -257,7 +273,8 @@ timers crowd, so they don't ssh into the same machine at once.
 | `cronward uninstall` | Remove the timers; config, tokens and state stay |
 | `cronward --version` | Which cronward this is |
 
-Exit codes: 0 fine, 1 a job's latest result is not passed (status), the
+Exit codes: 0 fine, 1 a job's latest result is not passed, or with `--host`
+the main machine cannot be reached or has stopped ticking (status), the
 start did not go through or with `--wait` the run did not pass (run),
 GitHub's check refused the job (add), a check failed (doctor), or the main
 machine was not reached (watch), 2 an error.

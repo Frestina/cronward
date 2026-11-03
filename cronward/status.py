@@ -6,7 +6,8 @@
      "accounts": [{"name", "token", "expires", "expires_soon"}]}
 
 latest is the newest final result, running the newest pending one, and
-recent the last RECENT results, oldest first.
+recent the last RECENT results, oldest first. A viewer's copy, shown by
+`status --host`, adds {"viewer": {...}} (notify.copy).
 """
 
 import datetime
@@ -84,12 +85,24 @@ def when(ts: float | None) -> str:
     return datetime.datetime.fromtimestamp(ts).strftime("%b %-d %H:%M")
 
 
-def text(st: dict) -> str:
-    now = st["now"]
+def text(st: dict, now: float | None = None) -> str:
+    """st as build makes it, or a viewer's copy with its "viewer" object."""
+    now = st["now"] if now is None else now
     tick = st["last_tick"]
+    v = st.get("viewer")
     lines = [f"cronward on {st['host']}: last tick "
              + (f"{when(tick)} ({age(now - tick)})" if tick else "never")]
-    if tick and now - tick > STALE:
+    if v:
+        lines.append(f"as of {when(v['fetched'])} ({age(now - v['fetched'])}), "
+                     f"from {v['host']}")
+        if v["unreachable_since"]:
+            lines.append(f"  cannot reach {v['host']} since {when(v['unreachable_since'])}: "
+                         f"{v['error']}")
+        elif v["offline"]:
+            lines.append("  this machine is offline, so this may be out of date")
+        if v["stopped_ticking"]:
+            lines.append(f"  {v['host']} has stopped ticking: check `cronward doctor` there.")
+    elif tick and now - tick > STALE:
         lines.append("  The timer has not ticked for a while: check `cronward doctor`.")
     if st["tick_error"]:
         lines.append(f"  The last tick failed: {st['tick_error']}")
@@ -126,5 +139,10 @@ def text(st: dict) -> str:
 
 
 def all_passed(st: dict) -> bool:
+    """For the exit code: every enabled job's latest result passed, and, on a
+    viewer's copy, the main machine was reached and is ticking."""
+    v = st.get("viewer")
+    if v and (v["unreachable_since"] or v["stopped_ticking"]):
+        return False
     return all(j["latest"] is None or j["latest"]["kind"] == PASSED
                for j in st["jobs"] if j["enabled"])
