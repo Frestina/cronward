@@ -15,6 +15,7 @@ from cronward import cron, notify, state, status, tokens
 from cronward.config import Config, Job
 from cronward.github import Client, GitHubError, HTTPProblem, NoAnswer, NotSent
 from cronward.state import DIDNT_RUN, FAILED, PASSED, PENDING
+from cronward.status import when
 
 LOOK_FOR = 600  # seconds to look for a run GitHub may have started
 FAILED_CONCLUSIONS = ("failure", "timed_out", "startup_failure")
@@ -45,10 +46,6 @@ class Clients:
                 self._failed[account] = str(e)
                 raise
         return self.made[account]
-
-
-def when(ts: float) -> str:
-    return datetime.datetime.fromtimestamp(ts).strftime("%b %-d %H:%M")
 
 
 def span(seconds: int) -> str:
@@ -96,7 +93,8 @@ def claim(cfg: Config, data: dict, now: float) -> tuple[list[tuple[Job, dict]], 
     for job in cfg.jobs:
         js = data["jobs"].setdefault(job.name, {"through": None, "notified": None})
         through = js.get("through")
-        js["through"] = now
+        # Never backwards: a clock stepped back would claim its slots again.
+        js["through"] = now if through is None else max(through, now)
         if through is None or not job.enabled:
             continue
         due = cron.slots(job.schedule, job.zone, through, now)
@@ -263,9 +261,10 @@ def run(cfg: Config, make: MakeClient = default_client, now: float | None = None
                         finished.append(rec)
             data["last_tick"] = now
             data["tick_error"] = None
+            state.error_told_path().unlink(missing_ok=True)
 
         for account, client in clients.made.items():
-            if client.expires:
+            if client.answered:
                 data["accounts"].setdefault(account, {})["expires"] = client.expires
         notices = notify.decide(cfg, data, finished, now)
         state.save(data)
@@ -273,8 +272,9 @@ def run(cfg: Config, make: MakeClient = default_client, now: float | None = None
     return notices
 
 
-def failed(cfg: Config, why: str) -> None:
-    """Records a tick that failed, so status and viewers show it."""
+def failed(cfg: Config, why: str) -> list[dict]:
+    """Records a tick that failed, so status and viewers show it. Returns a
+    notice the first time this error is seen since the last tick that worked."""
     try:
         with state.locked(wait=True):
             data = state.load()
@@ -285,6 +285,17 @@ def failed(cfg: Config, why: str) -> None:
         status_only = state.empty()
         status_only["tick_error"] = why
         state.write_json(state.status_path(), status.build(cfg, status_only))
+    told = state.error_told_path()
+    try:
+        if told.read_text() == why:
+            return []
+    except OSError:
+        pass
+    try:
+        told.write_text(why)
+    except OSError:
+        pass
+    return [{"title": "cronward: a tick failed", "body": notify.clean(why), "kind": "tick"}]
 
 
 def dry_run(cfg: Config, now: float | None = None) -> list[str]:

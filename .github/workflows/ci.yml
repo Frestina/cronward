@@ -12,7 +12,14 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        # The oldest Python cronward runs on, and the newest release.
+        python: ["3.11", "3.x"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      # Python 3.12 and shellcheck come with the image.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      # shellcheck comes with the image.
       - run: ./tests/run

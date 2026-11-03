@@ -11,14 +11,16 @@
     cronward install [--viewer HOST]     the user timer, on the main machine or a viewer
     cronward uninstall                   remove the timers
 
-Exit codes: 0 fine, 1 a job's latest result is not passed (status), a check
-failed (doctor) or the main machine was not reached (watch), 2 an error.
+Exit codes: 0 fine, 1 a job's latest result is not passed (status), the start
+did not go through (run), a check failed (doctor) or the main machine was not
+reached (watch), 2 an error.
 """
 
 import argparse
 import getpass
 import json
 import sys
+import traceback
 
 from cronward import config, doctor, notify, state, status, tick, timers, tokens
 from cronward.config import ConfigError
@@ -94,15 +96,22 @@ def cmd_token(action: str, account: str) -> int:
         return EXIT_ERROR
     client = Client(token)
     try:
-        login = client.user().get("login", "?")
+        login = notify.clean(client.user().get("login", "?"))
     except HTTPProblem as e:
-        print(f"cronward: GitHub refused the token ({e.status}: {e.message}); nothing stored",
-              file=sys.stderr)
+        print(f"cronward: GitHub refused the token ({e.status}: {notify.clean(e.message)}); "
+              "nothing stored", file=sys.stderr)
         return EXIT_ERROR
     except GitHubError as e:
-        print(f"cronward: cannot check the token: {e}; nothing stored", file=sys.stderr)
+        print(f"cronward: cannot check the token: {notify.clean(e)}; nothing stored",
+              file=sys.stderr)
         return EXIT_ERROR
     how = tokens.store(account, token)
+    if state.path().exists():
+        # The old token's expiry would otherwise warn until a tick reaches GitHub.
+        with state.locked(wait=True):
+            data = state.load()
+            data["accounts"][account] = {"expires": client.expires}
+            state.save(data)
     print(f"stored the token of GitHub user {login} for {account}, {how}")
     print(f"expires: {client.expires or 'never'}")
     if token.startswith("ghp_") or token.startswith("gho_"):
@@ -116,7 +125,7 @@ def cmd_workflows(account: str) -> int:
         client = tick.default_client(account)
         repos = client.repos()
     except (tokens.TokenError, GitHubError) as e:
-        print(f"cronward: {e}", file=sys.stderr)
+        print(f"cronward: {notify.clean(e)}", file=sys.stderr)
         return EXIT_ERROR
     if not repos:
         print(f"the token for {account} reaches no repos")
@@ -125,18 +134,17 @@ def cmd_workflows(account: str) -> int:
         try:
             found = client.workflows(name)
         except HTTPProblem as e:
-            print(f"{name}: cannot list workflows ({e.status}: the token may lack Actions "
-                  "access here)")
+            print(notify.clean(f"{name}: cannot list workflows ({e.status}: the token may "
+                               "lack Actions access here)"))
             continue
         except GitHubError as e:
-            print(f"{name}: {e}")
+            print(notify.clean(f"{name}: {e}"))
             continue
         if not found:
-            print(f"{name}: no workflows")
+            print(notify.clean(f"{name}: no workflows"))
         for w in found:
             file = str(w.get("path", "?")).rsplit("/", 1)[-1]
-            print(f"{name}  {file}  {notify.clean(w.get('name', ''))}  "
-                  f"({w.get('state', '?')})")
+            print(notify.clean(f"{name}  {file}  {w.get('name', '')}  ({w.get('state', '?')})"))
     return EXIT_OK
 
 
@@ -157,7 +165,8 @@ def cmd_run(name: str) -> int:
     notify.send(tick.run(cfg, manual=job), cfg)
     rec = state.latest(state.load(), job.name, final=False)
     if rec and rec["kind"] == state.PENDING:
-        print(f"started {job.name}: {rec.get('url') or 'looking for the run on GitHub'}")
+        print(f"started {job.name}: "
+              f"{notify.clean(rec.get('url') or 'looking for the run on GitHub')}")
         print("the next tick follows it to its end; see `cronward status`")
         return EXIT_OK
     if rec:
@@ -169,7 +178,8 @@ def cmd_tick(dry: bool) -> int:
     try:
         cfg = config.load()
     except ConfigError as e:
-        tick.failed(config.Config(), str(e))
+        cfg = config.Config()
+        notify.send(tick.failed(cfg, str(e)), cfg)
         raise
     if dry:
         for line in tick.dry_run(cfg):
@@ -181,10 +191,10 @@ def cmd_tick(dry: bool) -> int:
         print(f"{e}; this tick does nothing")
         return EXIT_OK
     except state.StateError as e:
-        tick.failed(cfg, str(e))
+        notify.send(tick.failed(cfg, str(e)), cfg)
         raise
     except Exception as e:
-        tick.failed(cfg, f"{type(e).__name__}: {e}")
+        notify.send(tick.failed(cfg, f"{type(e).__name__}: {e}"), cfg)
         raise
     notify.send(notices, cfg)
     return EXIT_OK
@@ -217,5 +227,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"cronward: {e}", file=sys.stderr)
         return EXIT_ERROR
     except KeyboardInterrupt:
+        return EXIT_ERROR
+    except Exception:
+        # Uncaught, Python exits 1, which the units count as a result, not a failure.
+        traceback.print_exc()
         return EXIT_ERROR
     raise AssertionError(args.cmd)

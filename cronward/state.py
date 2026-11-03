@@ -48,6 +48,12 @@ def status_path() -> Path:
     return config.state_dir() / "status.json"
 
 
+def error_told_path() -> Path:
+    """The last tick error a notice was given for. Kept apart from the state,
+    because a state that does not read is one of the errors."""
+    return config.state_dir() / "tick-error-told"
+
+
 def empty() -> dict:
     return {"version": VERSION, "jobs": {}, "accounts": {}, "results": [], "last_tick": None,
             "tick_error": None}

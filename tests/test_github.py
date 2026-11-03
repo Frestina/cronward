@@ -1,7 +1,11 @@
 import email.message
+import errno
+import http.client
+import socket
 import unittest
 import urllib.error
 import urllib.request
+from unittest import mock
 
 from cronward import github
 from tests.harness import EXPIRES, REPO, FakeGitHub
@@ -73,3 +77,46 @@ class HostTest(unittest.TestCase):
         same = handler.redirect_request(req, None, 301, "Moved", hdrs,
                                         "https://api.github.com/repositories/1")
         self.assertEqual(same.full_url, "https://api.github.com/repositories/1")
+
+
+class _Answer:
+    status, headers = 200, {}
+
+    def __init__(self, error):
+        self.error = error
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self, limit):
+        raise self.error
+
+
+class TransportErrorTest(unittest.TestCase):
+    """Only a connection that never opened may be sent again."""
+
+    def transport_raises(self, opened=None, reading=None):
+        answer = mock.patch.object(github._opener, "open", side_effect=opened,
+                                   return_value=_Answer(reading))
+        with answer, self.assertRaises(github.GitHubError) as caught:
+            github.urllib_transport("POST", "/x", b"{}", {})
+        return type(caught.exception)
+
+    def test_never_opened_is_not_sent(self):
+        for reason in (ConnectionRefusedError(), socket.gaierror(-2, "Name or service not known"),
+                       OSError(errno.ENETUNREACH, "Network is unreachable"),
+                       OSError(errno.EHOSTUNREACH, "No route to host")):
+            with self.subTest(reason):
+                self.assertIs(self.transport_raises(urllib.error.URLError(reason)),
+                              github.NotSent)
+
+    def test_anything_after_sending_is_no_answer(self):
+        for opened, reading in ((urllib.error.URLError(TimeoutError()), None),
+                                (TimeoutError(), None), (ConnectionResetError(), None),
+                                (None, http.client.IncompleteRead(b"{")),
+                                (http.client.BadStatusLine("garbage"), None)):
+            with self.subTest(opened or reading):
+                self.assertIs(self.transport_raises(opened, reading), github.NoAnswer)

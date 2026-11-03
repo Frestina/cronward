@@ -5,7 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
 from cronward import cli, config, state, tokens
-from tests.harness import JOB, REPO, CronwardTest
+from tests.harness import EXPIRES, JOB, REPO, CronwardTest
 
 
 class CliTest(CronwardTest):
@@ -34,6 +34,22 @@ class CliTest(CronwardTest):
         self.assertNotIn("github_pat_secret", out + err)
         self.assertEqual(tokens.load("personal"), "github_pat_secret")
         self.assertEqual(self.gh.calls[0][1], "/user")
+
+    def test_token_set_replaces_the_old_tokens_expiry(self):
+        self.config()
+        state.path().parent.mkdir(parents=True, exist_ok=True)
+        state.write_json(state.path(), {**state.empty(), "accounts": {
+            "personal": {"expires": "2026-11-01 00:00:00 UTC", "warned": "2026-11-01"}}})
+        self.run_cli("token", "set", "personal", stdin="github_pat_new\n")
+        self.assertEqual(state.load()["accounts"]["personal"], {"expires": EXPIRES})
+
+    def test_an_unexpected_error_exits_2(self):
+        self.config()
+        with mock.patch("cronward.tick.run", side_effect=KeyError("job")):
+            rc, _, err = self.run_cli("tick")
+        self.assertEqual(rc, 2)
+        self.assertIn("KeyError", err)
+        self.assertIn("KeyError", json.loads(state.status_path().read_text())["tick_error"])
 
     def test_a_refused_token_is_not_stored(self):
         self.gh.token_ok = False
@@ -90,6 +106,22 @@ class CliTest(CronwardTest):
         self.assertIn("does not read", err)
         st = json.loads(state.status_path().read_text())
         self.assertIn("does not read", st["tick_error"])
+
+    def test_a_failing_tick_is_told_once_until_a_tick_works(self):
+        self.config()
+        state.path().parent.mkdir(parents=True, exist_ok=True)
+        titles = []
+        for broken in (True, True, False, True):
+            if broken:
+                state.path().write_text("{not json")
+            else:
+                state.path().unlink()
+            self.run_cli("tick")
+            titles.append([c[-2] for c in self.calls("notify-send")])
+            for p in (self.root / "calls").glob("notify-send.*"):
+                p.unlink()
+        self.assertEqual(titles, [["cronward: a tick failed"], [], [],
+                                  ["cronward: a tick failed"]])
 
     def test_doctor(self):
         self.config()

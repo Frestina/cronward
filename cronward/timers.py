@@ -43,9 +43,12 @@ class Timer:
     service: tuple[str, ...]
 
 
+# A slow GitHub can keep one job's start busy for 4 minutes with its retries, and
+# a tick killed halfway leaves the rest of its slots unstarted. A long tick is
+# safe: the lock and the timer keep ticks from overlapping.
 TICK = Timer("cronward-tick", "start and follow scheduled workflows", ("tick",),
              ("OnCalendar=*:01/5", "Persistent=true", "AccuracySec=10s"),
-             (*QUIET, "TimeoutStartSec=4min"))
+             (*QUIET, "TimeoutStartSec=20min"))
 
 
 def watch_timer(host: str) -> Timer:
