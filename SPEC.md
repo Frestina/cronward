@@ -149,6 +149,10 @@ Then, for each claimed slot:
    turned back on (with `reenable`, the default) and the notice says so.
    `disabled_manually` didn't run: cronward never turns on a workflow the
    user turned off. Anything else didn't run, with GitHub's word for it.
+   GitHub's 60-day rule only turns off *scheduled* workflows in public
+   repos (its docs, "Disabling and enabling a workflow"), so once the
+   `schedule:` lines are out, `disabled_inactivity` should not happen;
+   `reenable` covers the time before that.
 5. **The start.** `POST .../dispatches` with `return_run_details`, on `ref`
    or the default branch. The answer holds the run's ID and URL.
    - Retried after 5, 10 and 20 seconds only on 408, 429, a rate limit, or a
@@ -201,8 +205,10 @@ A tick that fails (a config or state that does not read, or anything
 unexpected) gives one notice for each new error. The next tick that works
 resets it, so the same error coming back is told again.
 
-GitHub may also email the token's account when a run it started fails.
-cronward does not depend on that.
+GitHub also emails the token's account when a run it started fails (seen
+in a test, with the account's default notification settings), for every
+failure. cronward does not depend on that, and GitHub cannot tell of a
+missed slot or a refused start.
 
 ### Viewers
 
@@ -231,7 +237,7 @@ The minute keeps clear of Fleet's timers (fleetdoctor on the hour and at
 | `cronward init` | Write the example config |
 | `cronward token set <account>` | Check and store a token, read from stdin |
 | `cronward token remove <account>` | Delete a stored token |
-| `cronward workflows <account>` | The repos and workflows the token can reach |
+| `cronward workflows <account>` | The repos and workflows the token can reach (`GET /user/repos`, which lists exactly the repos a fine-grained token was given) |
 | `cronward add <job> --repo R --workflow W --schedule C` | Check a job with GitHub, then add it to the config |
 | `cronward remove <job>` | Take a job out of the config |
 | `cronward doctor` | Check config, tokens, repos, workflows, timer and lingering |
@@ -285,10 +291,3 @@ state.json an older one wrote.
 Running a check locally, a web UI, GitHub Apps, other forges (Forgejo and
 Gitea have a similar API), finding workflows by a marker in the file, and
 schedules more often than every 5 minutes.
-
-## To verify while building
-
-- Whether GitHub's 60-day rule disables a workflow that has no `schedule:`.
-- Whether GitHub emails the token's account when a dispatched run fails.
-- Whether `GET /user/repos` lists a fine-grained token's repos, for
-  `cronward workflows`.
