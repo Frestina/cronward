@@ -260,8 +260,11 @@ machine was not reached (watch), 2 an error.
 in any repo how to put one of its workflows on cronward: make it startable,
 `add` it, test it with `run --wait`, then take out its `schedule:`. It is an
 Agent Skill (a folder with a SKILL.md), so agents that read skills find it,
-and any other agent can be told to read the file. `install.sh` links it into
-`~/.agents/skills` and `~/.claude/skills` when those folders are there.
+and any other agent can be told to read the file. The repo is also a Claude
+Code plugin marketplace (`.claude-plugin/`) with one plugin, `cronward`,
+that holds only the skill. `install.sh` links the skill into
+`~/.agents/skills`, and into `~/.claude/skills` unless the plugin is
+installed, so Claude Code never has it twice.
 
 An agent never handles a token: when one is missing or lacks access, the
 skill has it tell the user what to do and stop. Change the skill in the same
@@ -280,7 +283,9 @@ memory and time limit), so they don't disturb other work on the machine.
 
 The version is `__version__` in `cronward/__init__.py`. `--version`, the
 first line of `doctor` and the User-Agent sent to GitHub
-(`cronward/<version>`) all say it. A release is a tag `vX.Y.Z` on main with
+(`cronward/<version>`) all say it, and the plugin's
+`.claude-plugin/plugin.json` carries the same one, which Claude Code uses to
+see an update. A release is a tag `vX.Y.Z` on main with
 notes on what changed. Before 1.0, the minor number goes up when an update
 needs something from the user (a config change, or `cronward install`
 again), and the patch number otherwise. A new version reads the config and

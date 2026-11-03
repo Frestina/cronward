@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Links bin/cronward into ~/.local/bin, and the agent skill into the skills
 # folders that are there: ~/.agents/skills (read by many agents) and
-# ~/.claude/skills (Claude Code). Safe to run again.
+# ~/.claude/skills (Claude Code). Not into ~/.claude/skills when the cronward
+# plugin is installed in Claude Code, which has the skill already: a link
+# from before is taken out, so the skill is not there twice. Safe to run
+# again.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -28,12 +31,27 @@ link() {
 
 link "$root/bin/cronward" "$dir/cronward"
 
+claude="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
+# Whether Claude Code has the cronward plugin, from any marketplace.
+has_plugin() {
+  grep -q '"cronward@' "$claude/plugins/installed_plugins.json" 2>/dev/null
+}
+
 found=0
-for skills in "$HOME/.agents/skills" "$HOME/.claude/skills"; do
-  if [[ -d $skills ]]; then
-    found=1
-    link "$root/skills/cronward" "$skills/cronward" || true
+for skills in "$HOME/.agents/skills" "$claude/skills"; do
+  [[ -d $skills ]] || continue
+  found=1
+  if [[ $skills == "$claude/skills" ]] && has_plugin; then
+    if [[ -L $skills/cronward && "$(readlink "$skills/cronward")" == "$root/skills/cronward" ]]; then
+      rm "$skills/cronward"
+      echo "removed $skills/cronward: the cronward plugin in Claude Code has the skill"
+    else
+      echo "not linking into $skills: the cronward plugin in Claude Code has the skill"
+    fi
+    continue
   fi
+  link "$root/skills/cronward" "$skills/cronward" || true
 done
 if ((found == 0)); then
   echo "note: no agent skills folder here; to use the skill, link $root/skills/cronward" \

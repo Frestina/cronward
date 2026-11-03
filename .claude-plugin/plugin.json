@@ -1,0 +1,13 @@
+{
+  "name": "cronward",
+  "version": "0.1.0",
+  "description": "The cronward skill: put a GitHub Actions workflow on cronward, which starts it on a schedule from your own Linux machine through workflow_dispatch and says whether each run passed; test, check or remove such a job. Needs cronward installed on a machine you can reach.",
+  "author": {
+    "name": "Frestina"
+  },
+  "homepage": "https://github.com/Frestina/cronward",
+  "repository": "https://github.com/Frestina/cronward",
+  "license": "MIT",
+  "keywords": ["github-actions", "cron", "workflow-dispatch", "scheduler", "systemd"],
+  "skills": ["./skills/cronward"]
+}

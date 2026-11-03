@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cronward",
+  "description": "cronward: GitHub Actions workflows on a schedule from your own Linux machine",
+  "owner": {
+    "name": "Frestina"
+  },
+  "plugins": [
+    {
+      "name": "cronward",
+      "description": "The cronward skill for agents: schedule a workflow with cronward, test it, check whether it passed, or remove it.",
+      "source": "./",
+      "category": "development"
+    }
+  ]
+}
