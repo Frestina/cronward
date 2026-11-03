@@ -5,9 +5,10 @@ whether a workflow has `workflow_dispatch:`, because that would need the
 token to read the repo's files; the first start says so if it is missing.
 """
 
+import platform
 import time
 
-from cronward import config, cron, state, status, timers, tokens
+from cronward import __version__, config, cron, state, status, timers, tokens
 from cronward.config import ConfigError
 from cronward.github import GitHubError, HTTPProblem
 from cronward.notify import clean
@@ -31,6 +32,7 @@ class Report:
 
 def run(make: MakeClient = default_client) -> int:
     r = Report()
+    r.ok(f"cronward {__version__}, Python {platform.python_version()}")
     try:
         cfg = config.load()
     except ConfigError as e:

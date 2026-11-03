@@ -21,6 +21,8 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 
+from cronward import __version__
+
 API = "https://api.github.com"
 HOST = "api.github.com"
 VERSION = "2022-11-28"
@@ -115,7 +117,7 @@ class Client:
             "Authorization": f"Bearer {self._token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": VERSION,
-            "User-Agent": "cronward",
+            "User-Agent": f"cronward/{__version__}",
         }
         data = None
         if body is not None:
