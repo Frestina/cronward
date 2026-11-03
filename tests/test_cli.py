@@ -168,6 +168,32 @@ class CliTest(CronwardTest):
         rc, out, _ = self.run_cli("doctor")
         self.assertEqual(rc, 1)
 
+    def test_doctor_says_when_notices_reach_no_one(self):
+        self.config()
+        tokens.store("personal", "t0ken")
+        rc, out, _ = self.run_cli("doctor")
+        self.assertNotIn("reach no one", out)
+        with mock.patch("cronward.doctor.shutil.which", return_value=None):
+            rc, out, _ = self.run_cli("doctor")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("warn  notices from this machine reach no one: notify-send is not "
+                      "installed, and notify.command is not set", out)
+
+    def test_no_user_manager_is_said_plainly(self):
+        self.config()
+        tokens.store("personal", "t0ken")
+        self.run_cli("install")
+        with mock.patch.dict(os.environ, {"CW_SYSTEMCTL": "nobus"}):
+            rc, out, _ = self.run_cli("doctor")
+            self.assertEqual(rc, 1)
+            self.assertIn("FAIL  cannot reach your systemd user manager (Failed to connect to "
+                          "bus: No medium found)", out)
+            self.assertIn("loginctl enable-linger", out)
+            self.run_cli("uninstall")
+            rc, _, err = self.run_cli("install")
+        self.assertEqual(rc, 2)
+        self.assertIn("cannot reach your systemd user manager", err)
+
     def test_workflows(self):
         tokens.store("personal", "t0ken")
         rc, out, _ = self.run_cli("workflows", "personal")

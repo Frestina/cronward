@@ -115,8 +115,14 @@ def _systemctl(*args: str) -> str:
     done = _run("systemctl", "--user", *args)
     if done.returncode != 0:
         lines = (done.stderr or done.stdout).strip().splitlines()
-        raise TimersError(f"systemctl --user {' '.join(args)}: "
-                          f"{lines[-1] if lines else f'exit {done.returncode}'}")
+        last = lines[-1] if lines else f"exit {done.returncode}"
+        if "Failed to connect to bus" in last:
+            # No user manager: not logged in (or only through su), and no lingering.
+            raise TimersError(f"cannot reach your systemd user manager ({last}). It runs while "
+                              "you are logged in, and always with lingering: log in to this "
+                              "machine (ssh or a desktop, not su), or turn lingering on with: "
+                              "loginctl enable-linger, then try again")
+        raise TimersError(f"systemctl --user {' '.join(args)}: {last}")
     return done.stdout
 
 
@@ -180,10 +186,8 @@ def uninstall() -> int:
 
 
 def active(name: str) -> str | None:
-    """The timer's ActiveState, or None when cronward did not install it."""
+    """The timer's ActiveState, or None when cronward did not install it. Raises
+    TimersError when systemd cannot say."""
     if not ours(unit_dir() / f"{name}.timer"):
         return None
-    try:
-        return _systemctl("show", "--property=ActiveState", "--value", f"{name}.timer").strip()
-    except TimersError:
-        return "unknown"
+    return _systemctl("show", "--property=ActiveState", "--value", f"{name}.timer").strip()

@@ -6,6 +6,7 @@ token to read the repo's files; the first start says so if it is missing.
 """
 
 import platform
+import shutil
 import time
 
 from cronward import __version__, config, cron, state, status, timers, tokens
@@ -100,7 +101,18 @@ def run(make: MakeClient = default_client) -> int:
         else:
             r.fail(f"{where}: GitHub says the workflow is {st}")
 
-    tick_state = timers.active(timers.TICK.name)
+    if not cfg.command and not (cfg.desktop and shutil.which("notify-send")):
+        why = ("desktop notices are off" if not cfg.desktop
+               else "notify-send is not installed")
+        r.warn(f"notices from this machine reach no one: {why}, and notify.command is not "
+               "set. Fine if a viewer watches it (cronward install --viewer HOST on your "
+               "laptop); otherwise set notify.command in the config")
+
+    try:
+        tick_state = timers.active(timers.TICK.name)
+    except timers.TimersError as e:
+        r.fail(str(e))
+        return 1
     if tick_state is None:
         r.warn("the timer is not installed on this machine; install it with: cronward install")
     elif tick_state != "active":

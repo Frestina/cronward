@@ -23,3 +23,26 @@ jobs:
           python-version: ${{ matrix.python }}
       # shellcheck comes with the image.
       - run: ./tests/run
+  distros:
+    # The systems people are likely to run cronward on, with their own Python.
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        image: ["debian:12", "ubuntu:24.04"]
+    container: ${{ matrix.image }}
+    steps:
+      - run: apt-get -qq update && apt-get -qq install -y python3 >/dev/null
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: ./tests/run
+  too-old:
+    # Ubuntu 22.04 has Python 3.10: one clear line, not a traceback.
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    steps:
+      - run: apt-get -qq update && apt-get -qq install -y python3 >/dev/null
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - shell: bash
+        run: |
+          out=$(./bin/cronward --version 2>&1) && rc=0 || rc=$?
+          echo "$out"
+          [[ $rc == 2 && $out == "cronward: needs Python 3.11 or newer, this is 3.10" ]]
