@@ -99,7 +99,7 @@ def text(st: dict) -> str:
         elif a["expires_soon"]:
             lines.append(f"  The token for {a['name']} expires {a['expires']}")
     if not st["jobs"]:
-        lines.append("\nNo jobs yet. Add one to the config; `cronward init` writes an example.")
+        lines.append("\nNo jobs yet. Add one with `cronward add`; `cronward add --help` says how.")
     for j in st["jobs"]:
         lines.append("")
         head = f"{j['name']}: {j['repo']} {j['workflow']}, {j['schedule']} {j['timezone']}"

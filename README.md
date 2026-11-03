@@ -32,7 +32,7 @@ drift-watch: me/dotfiles drift.yml, */15 * * * * UTC
 
 The runs still happen on GitHub's machines. cronward is not a runner and
 never runs code from a repo. It talks only to `api.github.com`, with a
-fine-grained token per account that can only start and read workflows.
+fine-grained token per account, limited to Actions in the repos you pick.
 
 ## Why not a crontab line with curl
 
@@ -216,14 +216,18 @@ about.
 ### On the machines you sit at
 
 If cronward runs on a server you don't look at, install a viewer on your
-laptop:
+laptop: the same `git clone` and `install.sh`, then
 
 ```sh
 cronward install --viewer homeserver   # anything you would type after ssh
 ```
 
-Every hour it reads the server's status over one ssh call (key files,
-batch mode, no agent) and gives the same notices, plus:
+`ssh homeserver` must work without a prompt: the host already known, and a
+key file without a passphrase, as the timer runs ssh in batch mode and
+never uses your ssh agent.
+
+Every hour it reads the server's status over one ssh call and gives the
+same notices, plus:
 
 - **stopped ticking**: the server's last tick is over 30 minutes old;
 - **can't be reached**: for 30 minutes;

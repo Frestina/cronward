@@ -95,9 +95,9 @@ def cmd_init() -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(config.TEMPLATE)
     print(f"wrote {path}\n"
-          "Next: add your jobs there, store a token for each account with "
-          "`cronward token set <account>`, check with `cronward doctor`, then "
-          "`cronward install`.")
+          "Next: store a token for each account with `cronward token set <account>`, "
+          "add jobs with `cronward add` (or in the file), check with `cronward doctor`, "
+          "then `cronward install`.")
     return EXIT_OK
 
 
@@ -369,7 +369,7 @@ def cmd_tick(dry: bool) -> int:
         notify.send(tick.failed(cfg, str(e)), cfg)
         raise
     if dry:
-        for line in tick.dry_run(cfg):
+        for line in tick.dry_run(cfg) or ["no jobs in the config; nothing is due"]:
             print(line)
         return EXIT_OK
     try:
