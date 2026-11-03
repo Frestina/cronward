@@ -220,13 +220,19 @@ class RunWaitTest(CronwardTest):
         self.assertIn("check failed: the run ended failure", out)
         self.assertEqual([c[-2] for c in self.calls("notify-send")], ["cronward: check failed"])
 
-    def test_run_waits_for_a_tick_to_finish(self):
-        done = []
+    def test_run_waits_for_a_tick_to_finish_and_says_so(self):
+        done, err = [], io.StringIO()
+
+        def run():
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                done.append((cli.main(["run", "check"]), out.getvalue()))
         with state.locked():
-            other = threading.Thread(target=lambda: done.append(self.run_cli("run", "check")))
+            other = threading.Thread(target=run)
             other.start()
             other.join(0.3)
             self.assertTrue(other.is_alive(), "run did not wait for the lock")
+            self.assertIn("waiting for another cronward (a tick) to finish", err.getvalue())
         other.join(5)
         rc, out = done[0]
         self.assertEqual(rc, 0, out)

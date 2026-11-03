@@ -21,6 +21,7 @@ import contextlib
 import fcntl
 import json
 import os
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -64,9 +65,14 @@ def locked(wait: bool = False) -> Iterator[None]:
     config.state_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
     with open(config.state_dir() / "lock", "w") as f:
         try:
-            fcntl.flock(f, fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise Busy("another cronward is running") from None
+            if not wait:
+                raise Busy("another cronward is running") from None
+            # Seconds as a rule, but a tick may take minutes when GitHub is slow.
+            print("waiting for another cronward (a tick) to finish", file=sys.stderr,
+                  flush=True)
+            fcntl.flock(f, fcntl.LOCK_EX)
         yield
 
 
