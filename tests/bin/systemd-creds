@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 # A fake systemd-creds: "encrypts" by writing FAKECRED, the --name, and the
 # text reversed, and decrypts only with the same --name. With
-# $CW_CREDS=fail it fails to encrypt.
+# $CW_CREDS=fail it fails to encrypt. $CW_SYSTEMD is its systemd version
+# (default 262); before 256 it has no --user, as the real one.
 set -uo pipefail
 "$(dirname "$0")/record" systemd-creds "$@"
+version=${CW_SYSTEMD:-262}
+if [[ ${1:-} == --version ]]; then
+  echo "systemd $version (fake)"
+  echo "+PAM +AUDIT"
+  exit 0
+fi
+if ((version < 256)) && [[ " $* " == *" --user "* ]]; then
+  echo "systemd-creds: unrecognized option '--user'" >&2
+  exit 1
+fi
 args=()
 name=""
 for a in "$@"; do

@@ -7,8 +7,9 @@ from tests.harness import BIN, CronwardTest
 
 class TokensTest(CronwardTest):
     def test_encrypted_with_systemd_creds(self):
-        how = tokens.store("personal", "github_pat_abc")
-        self.assertIn("encrypted", how)
+        how, why = tokens.store("personal", "github_pat_abc")
+        self.assertIn("encrypted with systemd-creds", how)
+        self.assertIsNone(why)
         self.assertEqual(tokens.kind("personal"), "encrypted")
         cred = tokens.token_dir() / "personal.cred"
         self.assertNotIn("github_pat_abc", cred.read_text())
@@ -26,8 +27,9 @@ class TokensTest(CronwardTest):
         path = os.pathsep.join(p for p in os.environ["PATH"].split(os.pathsep)
                                if p != str(BIN) and not os.path.exists(f"{p}/systemd-creds"))
         with mock.patch.dict(os.environ, {"PATH": path}):
-            how = tokens.store("personal", "github_pat_abc")
-        self.assertIn("not installed", how)
+            how, why = tokens.store("personal", "github_pat_abc")
+        self.assertIn("not encrypted", how)
+        self.assertEqual(why, "systemd-creds is not installed")
         plain = tokens.token_dir() / "personal.token"
         self.assertEqual(oct(plain.stat().st_mode & 0o777), "0o600")
         self.assertEqual(tokens.load("personal"), "github_pat_abc")
@@ -37,9 +39,34 @@ class TokensTest(CronwardTest):
 
     def test_plain_file_when_encryption_fails(self):
         with mock.patch.dict(os.environ, {"CW_CREDS": "fail"}):
-            how = tokens.store("personal", "github_pat_abc")
-        self.assertIn("could not encrypt", how)
+            _, why = tokens.store("personal", "github_pat_abc")
+        self.assertEqual(why, "systemd-creds could not encrypt it: "
+                              "Failed to determine local credential key")
         self.assertEqual(tokens.kind("personal"), "plain")
+
+    def test_plain_file_on_systemd_before_256_says_so(self):
+        with mock.patch.dict(os.environ, {"CW_SYSTEMD": "255"}):
+            _, why = tokens.store("personal", "github_pat_abc")
+            self.assertEqual(why, "this machine has systemd 255, and encryption needs 256 "
+                                  "or newer")
+            self.assertEqual(tokens.why_plain(), why)
+        self.assertEqual(tokens.kind("personal"), "plain")
+        text = tokens.warning("personal", why)
+        self.assertTrue(text.startswith("WARNING: the token for personal is NOT encrypted: "
+                                        "this machine has systemd 255"))
+        self.assertIn("cronward token set personal", " ".join(text.split()))
+
+    def test_plain_file_is_never_readable_by_others(self):
+        tokens.token_dir().mkdir(parents=True, mode=0o755)
+        old = os.umask(0)
+        try:
+            with mock.patch.dict(os.environ, {"CW_SYSTEMD": "252"}):
+                tokens.store("personal", "github_pat_abc")
+        finally:
+            os.umask(old)
+        self.assertEqual(oct(tokens.token_dir().stat().st_mode & 0o777), "0o700")
+        plain = tokens.token_dir() / "personal.token"
+        self.assertEqual(oct(plain.stat().st_mode & 0o777), "0o600")
 
     def test_storing_again_replaces_the_other_kind(self):
         with mock.patch.dict(os.environ, {"CW_CREDS": "fail"}):
