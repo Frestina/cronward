@@ -189,8 +189,8 @@ In Claude Code, install it as a plugin:
 For other agents, `install.sh` links it into `~/.agents/skills`, and into
 `~/.claude/skills` unless the plugin is installed. The plugin is only the
 skill: the `cronward` command still comes from the install above, on the
-machine that runs it, and on a laptop the skill reaches that machine over
-ssh. Then you can ask the agent working in a repo to
+machine that runs it, and on a laptop the skill reaches that machine with
+`cronward --on`. Then you can ask the agent working in a repo to
 "put check.yml on cronward, daily at 06:00". It adds `workflow_dispatch:`,
 runs `cronward add`, tests the job with `cronward run --wait`, and takes out
 the workflow's `schedule:` once a run has passed.
@@ -240,12 +240,21 @@ To look rather than wait for a notice, `cronward status --host homeserver`
 shows what the viewer last fetched, and when. `cronward watch homeserver`
 fetches it now.
 
+To change something on the server from the laptop, put `--on homeserver`
+first: `cronward --on homeserver add ...`, `cronward --on homeserver token
+set personal`, `cronward --on homeserver edit`. That is your normal ssh,
+with your keys and agent, so it needs a login on the server that can run
+commands, not only the viewer's read of the status. It runs only cronward
+there.
+
 ## Commands
 
 ```
 cronward init                        write the example config
+cronward edit                        open the config in your editor, then check it
 cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it
-cronward workflows ACCOUNT           the repos and workflows the token can reach
+cronward workflows [ACCOUNT] [--json]
+                                     the repos and workflows the tokens can reach
 cronward add JOB --repo R --workflow W --schedule CRON
                                      check a job with GitHub, then add it to the config
 cronward remove JOB                  take a job out of the config
@@ -257,6 +266,7 @@ cronward tick [--dry-run]            what the timer runs
 cronward watch HOST                  what a viewer's timer runs
 cronward install [--viewer HOST]     the user timer, on this machine or a viewer
 cronward uninstall                   remove the timers (config, tokens and state stay)
+cronward --on HOST COMMAND [ARGS]    run a cronward command on HOST over your ssh
 cronward --version                   which cronward this is
 ```
 
@@ -288,8 +298,9 @@ The `XDG_*_HOME` variables move them. [SPEC.md](SPEC.md) has every rule.
 - **What cronward does with it**: starts runs, reads them, and turns on a
   workflow GitHub turned off for inactivity (unless `reenable = false`).
 - **Where it talks**: only `https://api.github.com`, fixed in the code; a
-  redirect to another host is refused. Your `notify.command` and the
-  viewer's ssh are the only other traffic, and both are yours to set up.
+  redirect to another host is refused. Your `notify.command`, and the
+  viewer's ssh and `--on`, are the only other traffic, and all are yours
+  to set up.
 - **What runs on your machine**: cronward itself. Not a runner, so a pull
   request to a public repo can never run code here.
 

@@ -1,8 +1,10 @@
 """The cronward command.
 
     cronward init                        write the example config
+    cronward edit                        open the config in your editor, then check it
     cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it
-    cronward workflows ACCOUNT           the repos and workflows the token can reach
+    cronward workflows [ACCOUNT] [--json]
+                                         the repos and workflows the tokens can reach
     cronward add JOB --repo R --workflow W --schedule CRON
                                          check a job with GitHub, then add it to the config
     cronward remove JOB                  take a job out of the config
@@ -14,24 +16,32 @@
     cronward watch HOST                  what a viewer's timer runs
     cronward install [--viewer HOST]     the user timer, on the main machine or a viewer
     cronward uninstall                   remove the timers
+    cronward --on HOST COMMAND [ARGS]    run a cronward command on HOST, the main
+                                         machine, over your ssh
     cronward --version                   which cronward this is
 
 Exit codes: 0 fine, 1 a job's latest result is not passed, or with --host the
 main machine cannot be reached or has stopped ticking (status), the start
 did not go through or with --wait the run did not pass (run), GitHub's check
 refused the job (add), a check failed (doctor) or the main machine was not
-reached (watch), 2 an error.
+reached (watch), 2 an error. With --on, the far side's exit code, or 2 when
+ssh failed.
 """
 
 import argparse
 import getpass
 import json
+import os
 import re
+import shlex
+import shutil
+import subprocess
 import sys
 import time
 import traceback
 
-from cronward import __version__, config, cron, doctor, notify, state, status, tick, timers, tokens
+from cronward import (__version__, config, cron, doctor, notify, remote, state, status, tick,
+                      timers, tokens)
 from cronward.config import ConfigError
 from cronward.github import Client, GitHubError, HTTPProblem
 
@@ -45,13 +55,18 @@ def parser() -> argparse.ArgumentParser:
         description="Starts GitHub Actions workflows on a schedule from this machine, and "
                     "says whether they passed.")
     out.add_argument("--version", action="version", version=f"cronward {__version__}")
+    out.add_argument("--on", metavar="HOST",
+                     help="run the command on HOST, the main machine, over your ssh; comes "
+                          "first")
     sub = out.add_subparsers(dest="cmd", metavar="COMMAND", required=True)
     sub.add_parser("init", help="write the example config")
+    sub.add_parser("edit", help="open the config in your editor, then check it")
     p = sub.add_parser("token", help="store or delete an account's token")
     p.add_argument("action", choices=("set", "remove"))
     p.add_argument("account")
-    p = sub.add_parser("workflows", help="the repos and workflows a token can reach")
-    p.add_argument("account")
+    p = sub.add_parser("workflows", help="the repos and workflows the tokens can reach")
+    p.add_argument("account", nargs="?", help="default: every account in the config")
+    p.add_argument("--json", action="store_true", help="exact data, for scripts")
     p = sub.add_parser("add", help="check a job with GitHub, then add it to the config")
     p.add_argument("job", help="the job's name, used by commands and in notices")
     p.add_argument("--repo", required=True, metavar="OWNER/NAME")
@@ -160,31 +175,90 @@ def cmd_token(action: str, account: str) -> int:
     return EXIT_OK
 
 
-def cmd_workflows(account: str) -> int:
+def _workflows(account: str, jobs: tuple[config.Job, ...]) -> dict:
+    """What the account's token reaches: {"account", "error", "repos": [{"repo",
+    "error", "workflows": [{"file", "id", "name", "state", "jobs"}]}]}, with
+    the names of the jobs already on each workflow."""
+    out: dict = {"account": account, "error": None, "repos": []}
     try:
         client = tick.default_client(account)
         repos = client.repos()
     except (tokens.TokenError, GitHubError) as e:
-        print(f"cronward: {notify.clean(e)}", file=sys.stderr)
-        return EXIT_ERROR
-    if not repos:
-        print(f"the token for {account} reaches no repos")
+        out["error"] = notify.clean(e)
+        return out
     for repo in repos:
-        name = repo.get("full_name", "?")
+        name = notify.clean(repo.get("full_name", "?"))
+        entry: dict = {"repo": name, "error": None, "workflows": []}
+        out["repos"].append(entry)
         try:
             found = client.workflows(name)
         except HTTPProblem as e:
-            print(notify.clean(f"{name}: cannot list workflows ({e.status}: the token may "
-                               "lack Actions access here)"))
+            entry["error"] = (f"cannot list workflows ({e.status}: the token may lack Actions "
+                              "access here)")
             continue
         except GitHubError as e:
-            print(notify.clean(f"{name}: {e}"))
+            entry["error"] = notify.clean(e)
             continue
-        if not found:
-            print(notify.clean(f"{name}: no workflows"))
         for w in found:
-            file = str(w.get("path", "?")).rsplit("/", 1)[-1]
-            print(notify.clean(f"{name}  {file}  {w.get('name', '')}  ({w.get('state', '?')})"))
+            file = notify.clean(str(w.get("path", "?")).rsplit("/", 1)[-1])
+            ids = {file, str(w.get("id"))}
+            entry["workflows"].append({
+                "file": file, "id": w.get("id"), "name": notify.clean(w.get("name", "")),
+                "state": notify.clean(w.get("state", "?")),
+                "jobs": [j.name for j in jobs
+                         if j.repo.lower() == name.lower() and j.workflow in ids]})
+    return out
+
+
+def cmd_workflows(account: str | None, as_json: bool) -> int:
+    if account is not None and not config.NAME.fullmatch(account):
+        print(f"cronward: {account!r} is not an account name", file=sys.stderr)
+        return EXIT_ERROR
+    cfg = config.load(required=account is None)
+    names = (account,) if account else cfg.accounts
+    if not names:
+        raise ConfigError(f"no accounts in {config.config_path()}: add [accounts.<name>], "
+                          "then store its token with: cronward token set <name>")
+    found = [_workflows(name, cfg.jobs) for name in names]
+    if as_json:
+        json.dump({"accounts": found}, sys.stdout, indent=1, sort_keys=True)
+        print()
+    for acct in [] if as_json else found:
+        head = f"{acct['account']}: " if len(found) > 1 else ""
+        if acct["error"]:
+            print(f"{head}{acct['error']}", file=sys.stderr)
+        elif not acct["repos"]:
+            print(f"{head}the token for {acct['account']} reaches no repos")
+        for repo in acct["repos"]:
+            if repo["error"] or not repo["workflows"]:
+                print(f"{head}{repo['repo']}: {repo['error'] or 'no workflows'}")
+            for w in repo["workflows"]:
+                jobs = "".join(f", job {j}" for j in w["jobs"])
+                print(f"{head}{repo['repo']}  {w['file']}  {w['name']}  ({w['state']}{jobs})")
+    return EXIT_ERROR if any(a["error"] for a in found) else EXIT_OK
+
+
+def cmd_edit() -> int:
+    path = config.config_path()
+    if not path.exists():
+        raise ConfigError(f"no config at {path}; write one with: cronward init")
+    editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR")
+              or next((e for e in ("nano", "vi") if shutil.which(e)), None))
+    if not editor:
+        raise ConfigError(f"no editor: set $EDITOR, or edit {path} yourself")
+    with config.editing():
+        try:
+            subprocess.run([*shlex.split(editor), str(path)])
+        except OSError as e:
+            raise ConfigError(f"cannot run {editor}: {e.strerror}") from None
+    try:
+        cfg = config.load()
+    except ConfigError as e:
+        print(f"cronward: the config does not read now: {e}\nTicks stop with this error "
+              "until it is fixed: cronward edit", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"{path} reads: {len(cfg.accounts)} accounts, {len(cfg.jobs)} jobs. "
+          "Check them with: cronward doctor")
     return EXIT_OK
 
 
@@ -399,15 +473,34 @@ def cmd_tick(dry: bool) -> int:
     return EXIT_OK
 
 
+def commands() -> tuple[str, ...]:
+    """cronward's own command names, the only ones --on runs."""
+    sub = next(a for a in parser()._actions if isinstance(a, argparse._SubParsersAction))
+    return tuple(sub.choices)
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    try:
+        on = remote.split(argv)
+        if on:
+            return remote.run(*on, commands())
+    except remote.RemoteError as e:
+        print(f"cronward: {e}", file=sys.stderr)
+        return EXIT_ERROR
     args = parser().parse_args(argv)
+    if args.on is not None:
+        print("cronward: --on comes first: cronward --on HOST COMMAND", file=sys.stderr)
+        return EXIT_ERROR
     try:
         if args.cmd == "init":
             return cmd_init()
+        if args.cmd == "edit":
+            return cmd_edit()
         if args.cmd == "token":
             return cmd_token(args.action, args.account)
         if args.cmd == "workflows":
-            return cmd_workflows(args.account)
+            return cmd_workflows(args.account, args.json)
         if args.cmd == "doctor":
             return doctor.run()
         if args.cmd == "status":

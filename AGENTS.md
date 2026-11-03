@@ -16,6 +16,7 @@ behaviour, and change it in the same commit when a decision changes.
 - `cronward/tick.py`: a tick: claim, start, follow. The core.
 - `cronward/notify.py`: when to give a notice, giving it, and the viewer.
 - `cronward/status.py`: `status` and status.json.
+- `cronward/remote.py`: `--on HOST`, a command on the main machine over ssh.
 - `cronward/doctor.py`, `cronward/timers.py`: `doctor`, and the systemd units.
 - `skills/cronward/SKILL.md`: the skill for agents in other repos. Keep it in
   step with the commands it uses.

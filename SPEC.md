@@ -50,7 +50,7 @@ Only `success` is passed. Nothing unknown is ever shown as passed.
 4. **cronward talks to a host other than api.github.com.** The address is
    fixed in the code and a redirect elsewhere is refused. The only other
    traffic is what the user configures: `notify.command`, and a viewer's
-   ssh to the main machine.
+   ssh to the main machine (`watch`, and `--on`).
 5. **A token is written into the config or a log.**
 
 ## Config
@@ -253,14 +253,45 @@ machine's last tick was more than 30 minutes before it. Text mode says
 result is not passed, the main machine cannot be reached or has stopped
 ticking, and 2 when there is no copy yet.
 
+### Commands on the main machine, from a viewer
+
+`cronward --on <host> <command> [args]` runs a cronward command on the
+main machine, for a viewer such as a laptop with a bar widget that changes
+something there: `cronward --on homeserver add ...`. It is the user's
+normal ssh, with their keys and agent, so it needs a login that can run
+commands, unlike a viewer that only reads the status. With a terminal
+attached it uses `ssh -t`, so `token set` reads the token there and `edit`
+opens an editor; without one, batch mode, so it fails rather than waits for
+a prompt nobody sees. cronward stays the only thing that does ssh: a widget
+calls cronward, never ssh itself.
+
+Only cronward runs on the far side: the command name is checked against
+cronward's own commands first, the host may not start with `-`, and the
+arguments are quoted for the far side's shell (a POSIX shell, as for
+`watch`). It runs `~/.local/bin/cronward`, else `cronward` on the PATH
+there, and says so when neither is there. The exit code is passed through;
+ssh's own failure (255) is 2. Output is passed through as it comes: the far
+side is cronward, which cleans what it prints.
+
+`cronward edit` opens the config in `$VISUAL`, `$EDITOR`, nano or vi, holding
+the config lock while it is open (an `add` meanwhile waits and says so),
+then checks that the config reads.
+
+`cronward workflows [<account>] --json` is what a picker needs:
+`{"accounts": [{"account", "error", "repos": [{"repo", "error",
+"workflows": [{"file", "id", "name", "state", "jobs"}]}]}]}`, where `jobs`
+names the jobs already on that workflow. With no account, every account
+in the config. It exits 2 when an account's repos could not be listed.
+
 ## Commands
 
 | Command | |
 | --- | --- |
 | `cronward init` | Write the example config |
+| `cronward edit` | Open the config in the user's editor, then check that it reads |
 | `cronward token set <account>` | Check and store a token, read from stdin |
 | `cronward token remove <account>` | Delete a stored token |
-| `cronward workflows <account>` | The repos and workflows the token can reach (`GET /user/repos`, which lists exactly the repos a fine-grained token was given) |
+| `cronward workflows [<account>] [--json]` | The repos and workflows the token can reach (`GET /user/repos`, which lists exactly the repos a fine-grained token was given), and which are jobs; with no account, every account's |
 | `cronward add <job> --repo R --workflow W --schedule C` | Check a job with GitHub, then add it to the config |
 | `cronward remove <job>` | Take a job out of the config |
 | `cronward doctor` | Check config, tokens, repos, workflows, timer and lingering |
@@ -271,13 +302,15 @@ ticking, and 2 when there is no copy yet.
 | `cronward watch <host>` | What a viewer's timer runs |
 | `cronward install [--viewer <host>]` | The user timer, on the main machine or a viewer |
 | `cronward uninstall` | Remove the timers; config, tokens and state stay |
+| `cronward --on <host> <command>` | Run a cronward command on the main machine, over the user's ssh |
 | `cronward --version` | Which cronward this is |
 
 Exit codes: 0 fine, 1 a job's latest result is not passed, or with `--host`
 the main machine cannot be reached or has stopped ticking (status), the
 start did not go through or with `--wait` the run did not pass (run),
 GitHub's check refused the job (add), a check failed (doctor), or the main
-machine was not reached (watch), 2 an error.
+machine was not reached (watch), 2 an error. With `--on`, the far side's
+code, or 2 when ssh failed.
 
 ## Agents
 
