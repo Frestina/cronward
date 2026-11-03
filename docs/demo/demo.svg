@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="961" height="402" viewBox="0 0 961 402" role="img" xml:space="preserve" aria-label="cronward add, then cronward run --wait, then cronward status">
+<title>cronward add, run --wait and status</title>
+<style>text{font:14px ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace;font-variant-ligatures:none;fill:#d4d6e4;white-space:pre}.p{fill:#7f849c}.e{opacity:0;animation:23.535s step-end infinite}@keyframes k0{0%{opacity:0}2.124%{opacity:1}2.316%{opacity:0}}.k0{animation-name:k0}@keyframes k1{0%{opacity:0}2.316%{opacity:1}2.507%{opacity:0}}.k1{animation-name:k1}@keyframes k2{0%{opacity:0}2.507%{opacity:1}2.698%{opacity:0}}.k2{animation-name:k2}@keyframes k3{0%{opacity:0}2.698%{opacity:1}2.889%{opacity:0}}.k3{animation-name:k3}@keyframes k4{0%{opacity:0}2.889%{opacity:1}3.081%{opacity:0}}.k4{animation-name:k4}@keyframes k5{0%{opacity:0}3.081%{opacity:1}3.272%{opacity:0}}.k5{animation-name:k5}@keyframes k6{0%{opacity:0}3.272%{opacity:1}3.463%{opacity:0}}.k6{animation-name:k6}@keyframes k7{0%{opacity:0}3.463%{opacity:1}3.654%{opacity:0}}.k7{animation-name:k7}@keyframes k8{0%{opacity:0}3.654%{opacity:1}3.845%{opacity:0}}.k8{animation-name:k8}@keyframes k9{0%{opacity:0}3.845%{opacity:1}4.037%{opacity:0}}.k9{animation-name:k9}@keyframes k10{0%{opacity:0}4.037%{opacity:1}4.228%{opacity:0}}.k10{animation-name:k10}@keyframes k11{0%{opacity:0}4.228%{opacity:1}4.419%{opacity:0}}.k11{animation-name:k11}@keyframes k12{0%{opacity:0}4.419%{opacity:1}4.61%{opacity:0}}.k12{animation-name:k12}@keyframes k13{0%{opacity:0}4.61%{opacity:1}4.801%{opacity:0}}.k13{animation-name:k13}@keyframes k14{0%{opacity:0}4.801%{opacity:1}4.993%{opacity:0}}.k14{animation-name:k14}@keyframes k15{0%{opacity:0}4.993%{opacity:1}5.184%{opacity:0}}.k15{animation-name:k15}@keyframes k16{0%{opacity:0}5.184%{opacity:1}5.375%{opacity:0}}.k16{animation-name:k16}@keyframes k17{0%{opacity:0}5.375%{opacity:1}5.566%{opacity:0}}.k17{animation-name:k17}@keyframes k18{0%{opacity:0}5.566%{opacity:1}5.757%{opacity:0}}.k18{animation-name:k18}@keyframes k19{0%{opacity:0}5.757%{opacity:1}5.949%{opacity:0}}.k19{animation-name:k19}@keyframes k20{0%{opacity:0}5.949%{opacity:1}6.14%{opacity:0}}.k20{animation-name:k20}@keyframes k21{0%{opacity:0}6.14%{opacity:1}6.331%{opacity:0}}.k21{animation-name:k21}@keyframes k22{0%{opacity:0}6.331%{opacity:1}6.522%{opacity:0}}.k22{animation-name:k22}@keyframes k23{0%{opacity:0}6.522%{opacity:1}6.713%{opacity:0}}.k23{animation-name:k23}@keyframes k24{0%{opacity:0}6.713%{opacity:1}6.905%{opacity:0}}.k24{animation-name:k24}@keyframes k25{0%{opacity:0}6.905%{opacity:1}7.096%{opacity:0}}.k25{animation-name:k25}@keyframes k26{0%{opacity:0}7.096%{opacity:1}7.287%{opacity:0}}.k26{animation-name:k26}@keyframes k27{0%{opacity:0}7.287%{opacity:1}7.478%{opacity:0}}.k27{animation-name:k27}@keyframes k28{0%{opacity:0}7.478%{opacity:1}7.669%{opacity:0}}.k28{animation-name:k28}@keyframes k29{0%{opacity:0}7.669%{opacity:1}7.861%{opacity:0}}.k29{animation-name:k29}@keyframes k30{0%{opacity:0}7.861%{opacity:1}8.052%{opacity:0}}.k30{animation-name:k30}@keyframes k31{0%{opacity:0}8.052%{opacity:1}8.243%{opacity:0}}.k31{animation-name:k31}@keyframes k32{0%{opacity:0}8.243%{opacity:1}8.434%{opacity:0}}.k32{animation-name:k32}@keyframes k33{0%{opacity:0}8.434%{opacity:1}8.625%{opacity:0}}.k33{animation-name:k33}@keyframes k34{0%{opacity:0}8.625%{opacity:1}8.817%{opacity:0}}.k34{animation-name:k34}@keyframes k35{0%{opacity:0}8.817%{opacity:1}9.008%{opacity:0}}.k35{animation-name:k35}@keyframes k36{0%{opacity:0}9.008%{opacity:1}9.199%{opacity:0}}.k36{animation-name:k36}@keyframes k37{0%{opacity:0}9.199%{opacity:1}9.39%{opacity:0}}.k37{animation-name:k37}@keyframes k38{0%{opacity:0}9.39%{opacity:1}9.581%{opacity:0}}.k38{animation-name:k38}@keyframes k39{0%{opacity:0}9.581%{opacity:1}9.773%{opacity:0}}.k39{animation-name:k39}@keyframes k40{0%{opacity:0}9.773%{opacity:1}9.964%{opacity:0}}.k40{animation-name:k40}@keyframes k41{0%{opacity:0}9.964%{opacity:1}10.155%{opacity:0}}.k41{animation-name:k41}@keyframes k42{0%{opacity:0}10.155%{opacity:1}10.346%{opacity:0}}.k42{animation-name:k42}@keyframes k43{0%{opacity:0}10.346%{opacity:1}10.537%{opacity:0}}.k43{animation-name:k43}@keyframes k44{0%{opacity:0}10.537%{opacity:1}10.729%{opacity:0}}.k44{animation-name:k44}@keyframes k45{0%{opacity:0}10.729%{opacity:1}10.92%{opacity:0}}.k45{animation-name:k45}@keyframes k46{0%{opacity:0}10.92%{opacity:1}11.111%{opacity:0}}.k46{animation-name:k46}@keyframes k47{0%{opacity:0}11.111%{opacity:1}11.302%{opacity:0}}.k47{animation-name:k47}@keyframes k48{0%{opacity:0}11.302%{opacity:1}11.494%{opacity:0}}.k48{animation-name:k48}@keyframes k49{0%{opacity:0}11.494%{opacity:1}11.685%{opacity:0}}.k49{animation-name:k49}@keyframes k50{0%{opacity:0}11.685%{opacity:1}11.876%{opacity:0}}.k50{animation-name:k50}@keyframes k51{0%{opacity:0}11.876%{opacity:1}12.067%{opacity:0}}.k51{animation-name:k51}@keyframes k52{0%{opacity:0}12.067%{opacity:1}12.258%{opacity:0}}.k52{animation-name:k52}@keyframes k53{0%{opacity:0}12.258%{opacity:1}12.45%{opacity:0}}.k53{animation-name:k53}@keyframes k54{0%{opacity:0}12.45%{opacity:1}12.641%{opacity:0}}.k54{animation-name:k54}@keyframes k55{0%{opacity:0}12.641%{opacity:1}12.832%{opacity:0}}.k55{animation-name:k55}@keyframes k56{0%{opacity:0}12.832%{opacity:1}13.023%{opacity:0}}.k56{animation-name:k56}@keyframes k57{0%{opacity:0}13.023%{opacity:1}13.214%{opacity:0}}.k57{animation-name:k57}@keyframes k58{0%{opacity:0}13.214%{opacity:1}13.406%{opacity:0}}.k58{animation-name:k58}@keyframes k59{0%{opacity:0}13.406%{opacity:1}13.597%{opacity:0}}.k59{animation-name:k59}@keyframes k60{0%{opacity:0}13.597%{opacity:1}13.788%{opacity:0}}.k60{animation-name:k60}@keyframes k61{0%{opacity:0}13.788%{opacity:1}13.979%{opacity:0}}.k61{animation-name:k61}@keyframes k62{0%{opacity:0}13.979%{opacity:1}14.17%{opacity:0}}.k62{animation-name:k62}@keyframes k63{0%{opacity:0}14.17%{opacity:1}14.362%{opacity:0}}.k63{animation-name:k63}@keyframes k64{0%{opacity:0}14.362%{opacity:1}14.553%{opacity:0}}.k64{animation-name:k64}@keyframes k65{0%{opacity:0}14.553%{opacity:1}14.744%{opacity:0}}.k65{animation-name:k65}@keyframes k66{0%{opacity:0}14.744%{opacity:1}14.935%{opacity:0}}.k66{animation-name:k66}@keyframes k67{0%{opacity:0}14.935%{opacity:1}15.126%{opacity:0}}.k67{animation-name:k67}@keyframes k68{0%{opacity:0}15.126%{opacity:1}15.318%{opacity:0}}.k68{animation-name:k68}@keyframes k69{0%{opacity:0}15.318%{opacity:1}15.509%{opacity:0}}.k69{animation-name:k69}@keyframes k70{0%{opacity:0}15.509%{opacity:1}15.7%{opacity:0}}.k70{animation-name:k70}@keyframes k71{0%{opacity:0}15.7%{opacity:1}15.891%{opacity:0}}.k71{animation-name:k71}@keyframes k72{0%{opacity:0}15.891%{opacity:1}16.082%{opacity:0}}.k72{animation-name:k72}@keyframes k73{0%{opacity:0}16.082%{opacity:1}16.274%{opacity:0}}.k73{animation-name:k73}@keyframes k74{0%{opacity:0}16.274%{opacity:1}16.465%{opacity:0}}.k74{animation-name:k74}@keyframes k75{0%{opacity:0}16.465%{opacity:1}16.656%{opacity:0}}.k75{animation-name:k75}@keyframes k76{0%{opacity:0}16.656%{opacity:1}16.847%{opacity:0}}.k76{animation-name:k76}@keyframes k77{0%{opacity:0}16.847%{opacity:1}17.038%{opacity:0}}.k77{animation-name:k77}@keyframes k78{0%{opacity:0}17.038%{opacity:1}17.23%{opacity:0}}.k78{animation-name:k78}@keyframes k79{0%{opacity:0}17.23%{opacity:1}17.421%{opacity:0}}.k79{animation-name:k79}@keyframes k80{0%{opacity:0}17.421%{opacity:1}17.612%{opacity:0}}.k80{animation-name:k80}@keyframes k81{0%{opacity:0}17.612%{opacity:1}}.k81{animation-name:k81}@keyframes k82{0%{opacity:0}19.567%{opacity:1}}.k82{animation-name:k82}@keyframes k83{0%{opacity:0}20.076%{opacity:1}}.k83{animation-name:k83}@keyframes k84{0%{opacity:0}20.586%{opacity:1}}.k84{animation-name:k84}@keyframes k85{0%{opacity:0}30.189%{opacity:1}30.38%{opacity:0}}.k85{animation-name:k85}@keyframes k86{0%{opacity:0}30.38%{opacity:1}30.571%{opacity:0}}.k86{animation-name:k86}@keyframes k87{0%{opacity:0}30.571%{opacity:1}30.763%{opacity:0}}.k87{animation-name:k87}@keyframes k88{0%{opacity:0}30.763%{opacity:1}30.954%{opacity:0}}.k88{animation-name:k88}@keyframes k89{0%{opacity:0}30.954%{opacity:1}31.145%{opacity:0}}.k89{animation-name:k89}@keyframes k90{0%{opacity:0}31.145%{opacity:1}31.336%{opacity:0}}.k90{animation-name:k90}@keyframes k91{0%{opacity:0}31.336%{opacity:1}31.528%{opacity:0}}.k91{animation-name:k91}@keyframes k92{0%{opacity:0}31.528%{opacity:1}31.719%{opacity:0}}.k92{animation-name:k92}@keyframes k93{0%{opacity:0}31.719%{opacity:1}31.91%{opacity:0}}.k93{animation-name:k93}@keyframes k94{0%{opacity:0}31.91%{opacity:1}32.101%{opacity:0}}.k94{animation-name:k94}@keyframes k95{0%{opacity:0}32.101%{opacity:1}32.292%{opacity:0}}.k95{animation-name:k95}@keyframes k96{0%{opacity:0}32.292%{opacity:1}32.484%{opacity:0}}.k96{animation-name:k96}@keyframes k97{0%{opacity:0}32.484%{opacity:1}32.675%{opacity:0}}.k97{animation-name:k97}@keyframes k98{0%{opacity:0}32.675%{opacity:1}32.866%{opacity:0}}.k98{animation-name:k98}@keyframes k99{0%{opacity:0}32.866%{opacity:1}33.057%{opacity:0}}.k99{animation-name:k99}@keyframes k100{0%{opacity:0}33.057%{opacity:1}33.248%{opacity:0}}.k100{animation-name:k100}@keyframes k101{0%{opacity:0}33.248%{opacity:1}33.44%{opacity:0}}.k101{animation-name:k101}@keyframes k102{0%{opacity:0}33.44%{opacity:1}33.631%{opacity:0}}.k102{animation-name:k102}@keyframes k103{0%{opacity:0}33.631%{opacity:1}33.822%{opacity:0}}.k103{animation-name:k103}@keyframes k104{0%{opacity:0}33.822%{opacity:1}34.013%{opacity:0}}.k104{animation-name:k104}@keyframes k105{0%{opacity:0}34.013%{opacity:1}34.204%{opacity:0}}.k105{animation-name:k105}@keyframes k106{0%{opacity:0}34.204%{opacity:1}34.396%{opacity:0}}.k106{animation-name:k106}@keyframes k107{0%{opacity:0}34.396%{opacity:1}34.587%{opacity:0}}.k107{animation-name:k107}@keyframes k108{0%{opacity:0}34.587%{opacity:1}34.778%{opacity:0}}.k108{animation-name:k108}@keyframes k109{0%{opacity:0}34.778%{opacity:1}34.969%{opacity:0}}.k109{animation-name:k109}@keyframes k110{0%{opacity:0}34.969%{opacity:1}35.16%{opacity:0}}.k110{animation-name:k110}@keyframes k111{0%{opacity:0}35.16%{opacity:1}35.352%{opacity:0}}.k111{animation-name:k111}@keyframes k112{0%{opacity:0}35.352%{opacity:1}}.k112{animation-name:k112}@keyframes k113{0%{opacity:0}37.306%{opacity:1}}.k113{animation-name:k113}@keyframes k114{0%{opacity:0}37.816%{opacity:1}}.k114{animation-name:k114}@keyframes k115{0%{opacity:0}48.948%{opacity:1}}.k115{animation-name:k115}@keyframes k116{0%{opacity:0}49.203%{opacity:1}}.k116{animation-name:k116}@keyframes k117{0%{opacity:0}58.806%{opacity:1}58.997%{opacity:0}}.k117{animation-name:k117}@keyframes k118{0%{opacity:0}58.997%{opacity:1}59.188%{opacity:0}}.k118{animation-name:k118}@keyframes k119{0%{opacity:0}59.188%{opacity:1}59.38%{opacity:0}}.k119{animation-name:k119}@keyframes k120{0%{opacity:0}59.38%{opacity:1}59.571%{opacity:0}}.k120{animation-name:k120}@keyframes k121{0%{opacity:0}59.571%{opacity:1}59.762%{opacity:0}}.k121{animation-name:k121}@keyframes k122{0%{opacity:0}59.762%{opacity:1}59.953%{opacity:0}}.k122{animation-name:k122}@keyframes k123{0%{opacity:0}59.953%{opacity:1}60.144%{opacity:0}}.k123{animation-name:k123}@keyframes k124{0%{opacity:0}60.144%{opacity:1}60.336%{opacity:0}}.k124{animation-name:k124}@keyframes k125{0%{opacity:0}60.336%{opacity:1}60.527%{opacity:0}}.k125{animation-name:k125}@keyframes k126{0%{opacity:0}60.527%{opacity:1}60.718%{opacity:0}}.k126{animation-name:k126}@keyframes k127{0%{opacity:0}60.718%{opacity:1}60.909%{opacity:0}}.k127{animation-name:k127}@keyframes k128{0%{opacity:0}60.909%{opacity:1}61.1%{opacity:0}}.k128{animation-name:k128}@keyframes k129{0%{opacity:0}61.1%{opacity:1}61.292%{opacity:0}}.k129{animation-name:k129}@keyframes k130{0%{opacity:0}61.292%{opacity:1}61.483%{opacity:0}}.k130{animation-name:k130}@keyframes k131{0%{opacity:0}61.483%{opacity:1}61.674%{opacity:0}}.k131{animation-name:k131}@keyframes k132{0%{opacity:0}61.674%{opacity:1}}.k132{animation-name:k132}@keyframes k133{0%{opacity:0}63.629%{opacity:1}}.k133{animation-name:k133}@keyframes k134{0%{opacity:0}64.139%{opacity:1}}.k134{animation-name:k134}@keyframes k135{0%{opacity:0}64.393%{opacity:1}}.k135{animation-name:k135}@keyframes k136{0%{opacity:0}64.648%{opacity:1}}.k136{animation-name:k136}@keyframes k137{0%{opacity:0}64.903%{opacity:1}}.k137{animation-name:k137}@keyframes k138{0%{opacity:0}74.506%{opacity:1}}.k138{animation-name:k138}@media (prefers-reduced-motion:reduce){.e{animation:none}.z{opacity:1}}</style>
+<rect width="961" height="402" rx="8" fill="#1e1f29"/>
+<path d="M0 8a8 8 0 0 1 8-8h945a8 8 0 0 1 8 8v22H0z" fill="#2a2c39"/><circle cx="22" cy="15" r="6" fill="#ff5f57"/><circle cx="42" cy="15" r="6" fill="#febc2e"/><circle cx="62" cy="15" r="6" fill="#28c840"/>
+<text class="e k0" x="16" y="61"><tspan class="p">$ </tspan></text>
+<text class="e k1" x="16" y="61"><tspan class="p">$ </tspan>c</text>
+<text class="e k2" x="16" y="61"><tspan class="p">$ </tspan>cr</text>
+<text class="e k3" x="16" y="61"><tspan class="p">$ </tspan>cro</text>
+<text class="e k4" x="16" y="61"><tspan class="p">$ </tspan>cron</text>
+<text class="e k5" x="16" y="61"><tspan class="p">$ </tspan>cronw</text>
+<text class="e k6" x="16" y="61"><tspan class="p">$ </tspan>cronwa</text>
+<text class="e k7" x="16" y="61"><tspan class="p">$ </tspan>cronwar</text>
+<text class="e k8" x="16" y="61"><tspan class="p">$ </tspan>cronward</text>
+<text class="e k9" x="16" y="61"><tspan class="p">$ </tspan>cronward </text>
+<text class="e k10" x="16" y="61"><tspan class="p">$ </tspan>cronward a</text>
+<text class="e k11" x="16" y="61"><tspan class="p">$ </tspan>cronward ad</text>
+<text class="e k12" x="16" y="61"><tspan class="p">$ </tspan>cronward add</text>
+<text class="e k13" x="16" y="61"><tspan class="p">$ </tspan>cronward add </text>
+<text class="e k14" x="16" y="61"><tspan class="p">$ </tspan>cronward add n</text>
+<text class="e k15" x="16" y="61"><tspan class="p">$ </tspan>cronward add ni</text>
+<text class="e k16" x="16" y="61"><tspan class="p">$ </tspan>cronward add nig</text>
+<text class="e k17" x="16" y="61"><tspan class="p">$ </tspan>cronward add nigh</text>
+<text class="e k18" x="16" y="61"><tspan class="p">$ </tspan>cronward add night</text>
+<text class="e k19" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightl</text>
+<text class="e k20" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly</text>
+<text class="e k21" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly </text>
+<text class="e k22" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly -</text>
+<text class="e k23" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --</text>
+<text class="e k24" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --r</text>
+<text class="e k25" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --re</text>
+<text class="e k26" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --rep</text>
+<text class="e k27" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo</text>
+<text class="e k28" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo </text>
+<text class="e k29" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo m</text>
+<text class="e k30" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me</text>
+<text class="e k31" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/</text>
+<text class="e k32" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/w</text>
+<text class="e k33" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/wi</text>
+<text class="e k34" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/wid</text>
+<text class="e k35" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widg</text>
+<text class="e k36" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widge</text>
+<text class="e k37" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget</text>
+<text class="e k38" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget </text>
+<text class="e k39" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget -</text>
+<text class="e k40" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --</text>
+<text class="e k41" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --w</text>
+<text class="e k42" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --wo</text>
+<text class="e k43" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --wor</text>
+<text class="e k44" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --work</text>
+<text class="e k45" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workf</text>
+<text class="e k46" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workfl</text>
+<text class="e k47" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflo</text>
+<text class="e k48" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow</text>
+<text class="e k49" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow </text>
+<text class="e k50" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow c</text>
+<text class="e k51" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow ch</text>
+<text class="e k52" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow che</text>
+<text class="e k53" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow chec</text>
+<text class="e k54" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check</text>
+<text class="e k55" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.</text>
+<text class="e k56" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.y</text>
+<text class="e k57" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.ym</text>
+<text class="e k58" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml</text>
+<text class="e k59" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml </text>
+<text class="e k60" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml -</text>
+<text class="e k61" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --</text>
+<text class="e k62" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --s</text>
+<text class="e k63" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --sc</text>
+<text class="e k64" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --sch</text>
+<text class="e k65" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --sche</text>
+<text class="e k66" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --sched</text>
+<text class="e k67" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedu</text>
+<text class="e k68" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedul</text>
+<text class="e k69" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule</text>
+<text class="e k70" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule </text>
+<text class="e k71" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "</text>
+<text class="e k72" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0</text>
+<text class="e k73" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 </text>
+<text class="e k74" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6</text>
+<text class="e k75" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 </text>
+<text class="e k76" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 *</text>
+<text class="e k77" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 * </text>
+<text class="e k78" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 * *</text>
+<text class="e k79" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 * * </text>
+<text class="e k80" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 * * *</text>
+<text class="e k81 z" x="16" y="61"><tspan class="p">$ </tspan>cronward add nightly --repo me/widget --workflow check.yml --schedule "0 6 * * *"</text>
+<text class="e k82 z" x="16" y="81">added nightly to /home/me/.config/cronward/config.toml: me/widget check.yml, 0 6 * * * UTC, account personal</text>
+<text class="e k83 z" x="16" y="101">next slot: Nov 4 06:00</text>
+<text class="e k84 z" x="16" y="121">try it now with: cronward run nightly --wait</text>
+<text class="e k85" x="16" y="141"><tspan class="p">$ </tspan></text>
+<text class="e k86" x="16" y="141"><tspan class="p">$ </tspan>c</text>
+<text class="e k87" x="16" y="141"><tspan class="p">$ </tspan>cr</text>
+<text class="e k88" x="16" y="141"><tspan class="p">$ </tspan>cro</text>
+<text class="e k89" x="16" y="141"><tspan class="p">$ </tspan>cron</text>
+<text class="e k90" x="16" y="141"><tspan class="p">$ </tspan>cronw</text>
+<text class="e k91" x="16" y="141"><tspan class="p">$ </tspan>cronwa</text>
+<text class="e k92" x="16" y="141"><tspan class="p">$ </tspan>cronwar</text>
+<text class="e k93" x="16" y="141"><tspan class="p">$ </tspan>cronward</text>
+<text class="e k94" x="16" y="141"><tspan class="p">$ </tspan>cronward </text>
+<text class="e k95" x="16" y="141"><tspan class="p">$ </tspan>cronward r</text>
+<text class="e k96" x="16" y="141"><tspan class="p">$ </tspan>cronward ru</text>
+<text class="e k97" x="16" y="141"><tspan class="p">$ </tspan>cronward run</text>
+<text class="e k98" x="16" y="141"><tspan class="p">$ </tspan>cronward run </text>
+<text class="e k99" x="16" y="141"><tspan class="p">$ </tspan>cronward run n</text>
+<text class="e k100" x="16" y="141"><tspan class="p">$ </tspan>cronward run ni</text>
+<text class="e k101" x="16" y="141"><tspan class="p">$ </tspan>cronward run nig</text>
+<text class="e k102" x="16" y="141"><tspan class="p">$ </tspan>cronward run nigh</text>
+<text class="e k103" x="16" y="141"><tspan class="p">$ </tspan>cronward run night</text>
+<text class="e k104" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightl</text>
+<text class="e k105" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly</text>
+<text class="e k106" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly </text>
+<text class="e k107" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly -</text>
+<text class="e k108" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly --</text>
+<text class="e k109" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly --w</text>
+<text class="e k110" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly --wa</text>
+<text class="e k111" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly --wai</text>
+<text class="e k112 z" x="16" y="141"><tspan class="p">$ </tspan>cronward run nightly --wait</text>
+<text class="e k113 z" x="16" y="161">started nightly: https://github.com/me/widget/actions/runs/4170001</text>
+<text class="e k114 z" x="16" y="181">waiting up to 6h for it to end</text>
+<text class="e k115 z" x="16" y="201">nightly passed</text>
+<text class="e k116 z" x="16" y="221">https://github.com/me/widget/actions/runs/4170001</text>
+<text class="e k117" x="16" y="241"><tspan class="p">$ </tspan></text>
+<text class="e k118" x="16" y="241"><tspan class="p">$ </tspan>c</text>
+<text class="e k119" x="16" y="241"><tspan class="p">$ </tspan>cr</text>
+<text class="e k120" x="16" y="241"><tspan class="p">$ </tspan>cro</text>
+<text class="e k121" x="16" y="241"><tspan class="p">$ </tspan>cron</text>
+<text class="e k122" x="16" y="241"><tspan class="p">$ </tspan>cronw</text>
+<text class="e k123" x="16" y="241"><tspan class="p">$ </tspan>cronwa</text>
+<text class="e k124" x="16" y="241"><tspan class="p">$ </tspan>cronwar</text>
+<text class="e k125" x="16" y="241"><tspan class="p">$ </tspan>cronward</text>
+<text class="e k126" x="16" y="241"><tspan class="p">$ </tspan>cronward </text>
+<text class="e k127" x="16" y="241"><tspan class="p">$ </tspan>cronward s</text>
+<text class="e k128" x="16" y="241"><tspan class="p">$ </tspan>cronward st</text>
+<text class="e k129" x="16" y="241"><tspan class="p">$ </tspan>cronward sta</text>
+<text class="e k130" x="16" y="241"><tspan class="p">$ </tspan>cronward stat</text>
+<text class="e k131" x="16" y="241"><tspan class="p">$ </tspan>cronward statu</text>
+<text class="e k132 z" x="16" y="241"><tspan class="p">$ </tspan>cronward status</text>
+<text class="e k133 z" x="16" y="261">cronward on homeserver: last tick Nov 3 14:16 (20 s ago)</text>
+<text class="e k134 z" x="16" y="301">nightly: me/widget check.yml, 0 6 * * * UTC</text>
+<text class="e k135 z" x="16" y="321">  passed: started by hand Nov 3 14:12</text>
+<text class="e k136 z" x="16" y="341">  https://github.com/me/widget/actions/runs/4170001</text>
+<text class="e k137 z" x="16" y="361">  next: Nov 4 06:00</text>
+<text class="e k138 z" x="16" y="381"><tspan class="p">$ </tspan></text>
+</svg>

@@ -19,6 +19,8 @@ behaviour, and change it in the same commit when a decision changes.
 - `cronward/doctor.py`, `cronward/timers.py`: `doctor`, and the systemd units.
 - `skills/cronward/SKILL.md`: the skill for agents in other repos. Keep it in
   step with the commands it uses.
+- `docs/demo/make.py`: makes the README's recording from real output against
+  the FakeGitHub. A test fails when it is out of date; run it again.
 - `tests/`: `./tests/run` runs everything. `tests/harness.py` gives each
   test a throwaway home and a FakeGitHub transport; `tests/bin` holds fakes
   (notify-send, systemctl, loginctl, systemd-creds, ssh) that record calls.
