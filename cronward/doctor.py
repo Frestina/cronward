@@ -48,7 +48,11 @@ def run(make: MakeClient = default_client) -> int:
         if kind is None:
             r.fail(f"account {name}: no token; store one with: cronward token set {name}")
             continue
-        if kind == "plain":
+        if kind == "plain" and tokens.can_encrypt():
+            r.warn(f"account {name}: the token is NOT encrypted, so anything that can read "
+                   "your files can use it. This machine can encrypt it now: store it again "
+                   f"with: cronward token set {name}")
+        elif kind == "plain":
             r.warn(f"account {name}: the token is NOT encrypted ({tokens.why_plain()}), so "
                    "anything that can read your files can use it. To encrypt it: systemd "
                    f"{tokens.NEEDED} or newer, then cronward token set {name}")

@@ -60,10 +60,13 @@ writes a commented example. Unknown keys are errors, so a typo is caught.
 
 `cronward add` adds a job, and `cronward remove` takes one out. Both change
 the file's text, so its comments stay, write through a symlink, and read the
-result back before saving it. `add` first asks GitHub whether an account's
-token reaches the repo and whether the workflow is there and can be started.
-Without `--account` it takes the one account whose token reaches the repo.
-When none does, it says where to give the token access, and adds nothing.
+result back before saving it. They hold a lock from reading the file to
+saving it, so two at once (two agents, say) never lose one's change. `add`
+first asks GitHub whether an account's token reaches the repo and whether
+the workflow is there and can be started, and says what to give the token
+when it cannot read the workflows. Without `--account` it takes the one
+account whose token reaches the repo. When none does, it says where to give
+the token access, and adds nothing.
 
 ```toml
 timezone = "UTC"        # default. Or "local", or an IANA name like "Europe/Oslo"
@@ -117,7 +120,9 @@ by others even for a moment. That is the case on Ubuntu 24.04 and Debian
 12, likely home servers, so it is said loudly: the README says it before
 the install, `token set` prints a warning with the reason (such as the
 systemd version) and what to do, and `doctor` warns on every run while a
-token is a plain file. A token is never refused for being plain: on those
+token is a plain file, and says when the machine can now encrypt it.
+`token set` refuses text with characters no GitHub token has, without
+showing it. A token is never refused for being plain: on those
 systems cronward would not work at all.
 
 GitHub sends a token's expiry date with every answer. cronward keeps it and
@@ -135,7 +140,9 @@ For each enabled job:
 1. **Due slots** are the schedule's slots after the job's `through` time and
    up to now. A new job starts from the first tick that sees it; it has no
    past slots. A disabled job's `through` follows the clock, so turning it on
-   again reports nothing missed.
+   again reports nothing missed. So does that of a job taken out of the
+   config: added again, it has no slots from the time it was out. A run of
+   it that was still going ends as didn't run, with no notice.
 2. **Missed slots.** When more than one slot is due (the machine was off),
    the latest one runs. The others are recorded as one didn't run result,
    "missed N slots from A to B".
@@ -177,7 +184,7 @@ Then, for every pending result:
 
 `cronward tick --dry-run` prints what is due and why, and changes nothing.
 `cronward run <job>` starts a job now, outside its schedule, recorded as a
-manual slot. With `--wait [TIME]` it follows the run to its end, for at most
+manual slot. It waits for a tick that holds the lock to finish. With `--wait [TIME]` it follows the run to its end, for at most
 TIME or the job's `finish_within`, gives the notice a tick would, and exits
 0 only if the run passed. A run still going at the limit is left to the
 ticks.
@@ -227,8 +234,8 @@ The viewer keeps its own record of what it has said, and says:
 - **The main machine can't be reached**: after 30 minutes, once, and again
   when it is back. When the viewer itself is offline it says nothing.
 
-The minute keeps clear of Fleet's timers (fleetdoctor on the hour and at
-:02, :07, ...; fleetlog at :15, :45 and :50).
+The minute keeps clear of the hour and the quarter hours, where other
+timers crowd, so they don't ssh into the same machine at once.
 
 ## Commands
 

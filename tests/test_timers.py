@@ -63,8 +63,8 @@ class TimersTest(CronwardTest):
         quiet(timers.uninstall)
         self.assertTrue((timers.unit_dir() / "cronward-tick.timer").exists())
 
-    def test_the_viewer_keeps_off_fleets_minutes(self):
-        fleet = {0, 15, 45, 50} | set(range(2, 60, 5))
+    def test_the_viewer_keeps_off_busy_minutes(self):
+        busy = {0, 15, 30, 45} | set(range(2, 60, 5))
         line = next(s for s in timers.watch_timer("x").schedule if s.startswith("OnCalendar"))
         self.assertEqual(line, "OnCalendar=*:08")
-        self.assertNotIn(int(re.search(r":(\d+)$", line).group(1)), fleet)
+        self.assertNotIn(int(re.search(r":(\d+)$", line).group(1)), busy)

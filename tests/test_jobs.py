@@ -1,4 +1,5 @@
 import io
+import threading
 import types
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
@@ -122,6 +123,42 @@ class AddRemoveTest(CronwardTest):
         self.assertIn("there is a job check already", err)
         self.assertEqual(self.gh.calls, [])
 
+    def test_two_adds_at_once_both_stay(self):
+        self.config(CONFIG)
+        tokens.store("work", "t0ken")
+        self.gh.repos["me/other"] = {"full_name": "me/other", "default_branch": "main"}
+        self.gh.workflows[("me/other", "check.yml")] = {"state": "active",
+                                                        "path": ".github/workflows/check.yml"}
+        # cli.main itself, not run_cli: redirecting stdout in two threads at
+        # once would leave it pointing at the wrong place.
+        other = threading.Thread(target=cli.main, args=([
+            "add", "other", "--repo", "me/other", "--workflow", "check.yml",
+            "--schedule", "0 7 * * *"],))
+        real = cli._check
+
+        def slow_check(*args):
+            # The second add starts while the first asks GitHub.
+            if other.ident is None:
+                other.start()
+                other.join(0.3)
+                self.assertTrue(other.is_alive(), "the second add did not wait")
+            return real(*args)
+
+        with mock.patch.object(cli, "_check", slow_check), redirect_stdout(io.StringIO()):
+            rc, _, err = self.run_cli(*ADD)
+            other.join(5)
+        self.assertEqual(rc, 0, err)
+        self.assertEqual({j.name for j in config.load().jobs}, {"check", "nightly", "other"})
+
+    def test_a_token_without_actions_access_says_so(self):
+        self.config(CONFIG)
+        tokens.store("work", "t0ken")
+        self.gh.script = [("GET", "/actions/workflows/check.yml", 403)]
+        rc, _, err = self.run_cli(*ADD)
+        self.assertEqual(rc, 1)
+        self.assertIn("the token for work cannot read the workflows of me/widget", err)
+        self.assertIn("Actions: read and write", err)
+
     def test_remove(self):
         self.config(CONFIG)
         rc, out, _ = self.run_cli("remove", "check")
@@ -182,6 +219,18 @@ class RunWaitTest(CronwardTest):
         self.assertEqual(rc, 1)
         self.assertIn("check failed: the run ended failure", out)
         self.assertEqual([c[-2] for c in self.calls("notify-send")], ["cronward: check failed"])
+
+    def test_run_waits_for_a_tick_to_finish(self):
+        done = []
+        with state.locked():
+            other = threading.Thread(target=lambda: done.append(self.run_cli("run", "check")))
+            other.start()
+            other.join(0.3)
+            self.assertTrue(other.is_alive(), "run did not wait for the lock")
+        other.join(5)
+        rc, out = done[0]
+        self.assertEqual(rc, 0, out)
+        self.assertIn("started check", out)
 
     def test_a_run_still_going_at_the_limit_is_left_to_the_tick(self):
         rc, out = self.run_cli("run", "check", "--wait", "1m")

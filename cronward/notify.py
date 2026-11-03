@@ -87,7 +87,8 @@ def decide(cfg: Config, data: dict, finished: list[dict], now: float) -> list[di
     """The main machine's notices after a tick; records them in data."""
     notified = {name: js.get("notified") for name, js in data["jobs"].items()}
     jobs = {j.name: {"repo": j.repo, "workflow": j.workflow} for j in cfg.jobs}
-    out = changes(notified, finished, jobs)
+    # A job taken out of the config gets no notices, as on a viewer.
+    out = changes(notified, [r for r in finished if r["job"] in jobs], jobs)
     for name, kind in notified.items():
         data["jobs"].setdefault(name, {})["notified"] = kind
     today = datetime.date.fromtimestamp(now).isoformat()

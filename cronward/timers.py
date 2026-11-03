@@ -2,9 +2,9 @@
 
 On the main machine, the tick: at minute 1 of every 5, and once at start
 after a missed time. On a viewer, the watch: hourly at :08, soon enough for
-jobs that run daily. The minute keeps clear of Fleet's timers (fleetdoctor
-on the hour and at :02, :07, ...; fleetlog at :15, :45 and :50), so they
-never ssh into the same machine at once.
+jobs that run daily. The minute keeps clear of the hour and the quarter
+hours, where other timers crowd, so they don't ssh into the same machine at
+once.
 
 The main machine may run other work, so the services run at low priority
 (Nice=19, idle CPU and IO scheduling), with a memory limit and a time limit.

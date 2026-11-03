@@ -82,6 +82,7 @@ Jobs live on the main machine, which holds the config and the tokens. Run
    | --- | --- |
    | Exit 0 | Added. It prints the next slot. |
    | Exit 1, "no account's token reaches" | Stop. Ask the user to add the repo to their token's repository access at the page it prints (or to store a token), then run `add` again. You cannot do this for them. |
+   | Exit 1, "cannot read the workflows" | Stop. The token reaches the repo but lacks Actions: read and write. Ask the user to give it that at the page it prints, then run `add` again. |
    | Exit 1, "not a workflow on ... default branch" | Step 2 is not merged yet. |
    | Exit 1, "turned off in GitHub" | The user turned the workflow off. Ask before anyone turns it on. |
    | Exit 2 | A wrong value, or several accounts reach the repo (then pass `--account`). The message says which. |

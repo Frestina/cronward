@@ -252,8 +252,21 @@ class FollowTest(CronwardTest):
     def test_a_removed_job_does_not_stay_pending(self):
         self.started()
         cfg = self.config("[accounts.personal]\n")
-        self.tick(cfg, "2026-11-03 06:06")
+        notices = self.tick(cfg, "2026-11-03 06:06")
         self.assertIn("removed from the config", results()[0]["reason"])
+        self.assertEqual(notices, [])
+
+    def test_a_job_added_again_later_reports_nothing_missed(self):
+        cfg = self.config()
+        self.tick(cfg, "2026-11-01 05:56")
+        self.tick(self.config("[accounts.personal]\n"), "2026-11-01 06:01")
+        self.tick(self.config("[accounts.personal]\n"), "2026-11-20 14:56")
+        notices = self.tick(self.config(), "2026-11-20 15:01")
+        self.assertEqual(notices, [])
+        self.assertEqual(results(), [])
+        self.assertEqual(self.gh.calls_to("POST"), [])
+        self.tick(cfg, "2026-11-21 06:01")
+        self.assertEqual([r["slot"] for r in results()], [at("2026-11-21 06:00")])
 
 
 class NoticeTest(CronwardTest):

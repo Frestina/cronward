@@ -17,7 +17,9 @@ jobs:
         # The oldest Python cronward runs on, and the newest release.
         python: ["3.11", "3.x"]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
@@ -32,7 +34,9 @@ jobs:
     container: ${{ matrix.image }}
     steps:
       - run: apt-get -qq update && apt-get -qq install -y python3 >/dev/null
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: ./tests/run
   too-old:
     # Ubuntu 22.04 has Python 3.10: one clear line, not a traceback.
@@ -40,7 +44,9 @@ jobs:
     container: ubuntu:22.04
     steps:
       - run: apt-get -qq update && apt-get -qq install -y python3 >/dev/null
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - shell: bash
         run: |
           out=$(./bin/cronward --version 2>&1) && rc=0 || rc=$?

@@ -24,6 +24,7 @@ reached (watch), 2 an error.
 import argparse
 import getpass
 import json
+import re
 import sys
 import time
 import traceback
@@ -33,6 +34,7 @@ from cronward.config import ConfigError
 from cronward.github import Client, GitHubError, HTTPProblem
 
 EXIT_OK, EXIT_NOT_PASSED, EXIT_ERROR = 0, 1, 2
+TOKEN = re.compile(r"[A-Za-z0-9_]+")  # github_pat_..., ghp_...
 
 
 def parser() -> argparse.ArgumentParser:
@@ -120,6 +122,11 @@ def cmd_token(action: str, account: str) -> int:
     token = token.strip()
     if not token:
         print("cronward: no token given; nothing stored", file=sys.stderr)
+        return EXIT_ERROR
+    if not TOKEN.fullmatch(token):
+        # Not shown: it may be most of a real token.
+        print("cronward: that is not a token: it has spaces, quotes or other characters a "
+              "GitHub token never has; nothing stored", file=sys.stderr)
         return EXIT_ERROR
     client = Client(token)
     try:
@@ -222,11 +229,15 @@ def _account_for(accounts: tuple[str, ...], repo: str) -> tuple[str, Client]:
     return reached[0]
 
 
-def _check(client: Client, repo: str, workflow: str, reenable: bool) -> str:
+def _check(client: Client, account: str, repo: str, workflow: str, reenable: bool) -> str:
     """The workflow's state, when cronward can start it; CheckFailed if not."""
     try:
         wf = client.workflow(repo, workflow)
     except HTTPProblem as e:
+        if e.status == 403 and not e.rate_limited:
+            raise CheckFailed(f"the token for {account} cannot read the workflows of {repo} "
+                              f"({notify.clean(e.message)}). Give it Actions: read and write "
+                              f"on {repo} at {TOKENS_PAGE}, then run this again.") from None
         if e.status != 404:
             raise CheckFailed(str(e)) from None
         try:
@@ -248,6 +259,11 @@ def _check(client: Client, repo: str, workflow: str, reenable: bool) -> str:
 
 
 def cmd_add(a: argparse.Namespace) -> int:
+    with config.editing():
+        return _add(a)
+
+
+def _add(a: argparse.Namespace) -> int:
     path = config.config_path()
     try:
         text = path.read_text()
@@ -281,7 +297,7 @@ def cmd_add(a: argparse.Namespace) -> int:
     config.with_job(text, a.job, {"account": a.account or cfg.accounts[0], **settings})
     try:
         account, client = _account_for((a.account,) if a.account else cfg.accounts, a.repo)
-        wf_state = _check(client, a.repo, a.workflow, cfg.reenable)
+        wf_state = _check(client, account, a.repo, a.workflow, cfg.reenable)
     except CheckFailed as e:
         print(f"cronward: {notify.clean(e)}\nNothing was added.", file=sys.stderr)
         return EXIT_NOT_PASSED
@@ -304,12 +320,13 @@ def cmd_add(a: argparse.Namespace) -> int:
 
 def cmd_remove(name: str) -> int:
     path = config.config_path()
-    try:
-        text = path.read_text()
-    except FileNotFoundError:
-        raise ConfigError(f"no config at {path}") from None
-    config.parse(text, str(path)).job(name)
-    config.save(config.without_job(text, name))
+    with config.editing():
+        try:
+            text = path.read_text()
+        except FileNotFoundError:
+            raise ConfigError(f"no config at {path}") from None
+        config.parse(text, str(path)).job(name)
+        config.save(config.without_job(text, name))
     print(f"removed {name} from {path}")
     print("If GitHub should run the workflow on its own again, put its `schedule:` back.")
     return EXIT_OK
