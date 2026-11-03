@@ -208,12 +208,13 @@ def svg(events: list[tuple[float, str]]) -> str:
     css = (f"text{{font:{FONT}px ui-monospace,SFMono-Regular,Menlo,Consolas,"
            f'"DejaVu Sans Mono",monospace;font-variant-ligatures:none;fill:{FG};'
            f"white-space:pre}}"
-           f".p{{fill:{DIM}}}"
+           f".p{{fill:{DIM}}}.t{{font-size:12px;fill:{DIM}}}"
            f".e{{opacity:0;animation:{total:.3f}s step-end infinite}}"
            + "".join(styles)
            + "@media (prefers-reduced-motion:reduce){.e{animation:none}.z{opacity:1}}")
-    dots = "".join(f'<circle cx="{PAD + 6 + 20 * k}" cy="{BAR // 2}" r="6" fill="{c}"/>'
-                   for k, c in enumerate(("#ff5f57", "#febc2e", "#28c840")))
+    # A plain title bar, as a Linux terminal has, with the user and host.
+    title = (f'<text class="t" x="{width / 2:g}" y="{BAR // 2 + 4}" text-anchor="middle">'
+             f"me@{HOST}: ~</text>")
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'viewBox="0 0 {width} {height}" role="img" xml:space="preserve" '
             f'aria-label="cronward add, then cronward run --wait, then cronward status">\n'
@@ -221,7 +222,7 @@ def svg(events: list[tuple[float, str]]) -> str:
             f"<style>{css}</style>\n"
             f'<rect width="{width}" height="{height}" rx="8" fill="{BG}"/>\n'
             f'<path d="M0 8a8 8 0 0 1 8-8h{width - 16}a8 8 0 0 1 8 8v{BAR - 8}H0z" '
-            f'fill="{BAR_BG}"/>{dots}\n'
+            f'fill="{BAR_BG}"/>{title}\n'
             + "\n".join(texts) + "\n</svg>\n")
 
 
