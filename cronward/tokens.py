@@ -59,6 +59,12 @@ def why_plain(error: str = "") -> str:
     return f"systemd-creds could not encrypt it: {error or 'no reason given'}"
 
 
+def can_encrypt() -> bool:
+    """Whether this machine has a systemd-creds that can encrypt for a user."""
+    version = systemd_version() if shutil.which("systemd-creds") else None
+    return version is not None and version >= NEEDED
+
+
 def warning(account: str, why: str) -> str:
     """What `token set` says when the token is stored as a plain file."""
     body = (f"It is a file only you can read, but anything that can read your files, such "

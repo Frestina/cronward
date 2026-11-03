@@ -191,8 +191,7 @@ machine that runs it, and on a laptop the skill reaches that machine over
 ssh. Then you can ask the agent working in a repo to
 "put check.yml on cronward, daily at 06:00". It adds `workflow_dispatch:`,
 runs `cronward add`, tests the job with `cronward run --wait`, and takes out
-the workflow's `schedule:` once a run has passed. It works over ssh when
-cronward runs on another machine.
+the workflow's `schedule:` once a run has passed.
 
 An agent never handles your token. When the token can't reach the repo yet,
 it tells you where to add the repo, and waits. For an agent that does not

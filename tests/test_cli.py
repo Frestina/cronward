@@ -50,6 +50,23 @@ class CliTest(CronwardTest):
         self.assertIn("warn  account personal: the token is NOT encrypted (this machine has "
                       "systemd 255", out)
 
+    def test_doctor_says_when_a_plain_token_can_now_be_encrypted(self):
+        self.config()
+        with mock.patch.dict(os.environ, {"CW_SYSTEMD": "255"}):
+            self.run_cli("token", "set", "personal", stdin="github_pat_x\n")
+        rc, out, _ = self.run_cli("doctor")
+        self.assertIn("warn  account personal: the token is NOT encrypted, so anything that "
+                      "can read your files can use it. This machine can encrypt it now", out)
+
+    def test_a_token_with_odd_characters_is_refused_and_not_shown(self):
+        self.config()
+        rc, out, err = self.run_cli("token", "set", "personal",
+                                    stdin="\u201cgithub_pat_secret\u201d\n")
+        self.assertEqual(rc, 2)
+        self.assertIn("not a token", err)
+        self.assertNotIn("github_pat_secret", out + err)
+        self.assertEqual(self.gh.calls, [])
+
     def test_token_set_replaces_the_old_tokens_expiry(self):
         self.config()
         state.path().parent.mkdir(parents=True, exist_ok=True)

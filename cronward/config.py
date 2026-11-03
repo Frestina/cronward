@@ -6,17 +6,21 @@ errors, so a typo is caught instead of quietly ignored. A config with no
 jobs is fine: a viewer needs none.
 
 `cronward add` and `remove` change the file's text, not a parsed copy, so
-comments stay. Every change is read back before it is saved.
+comments stay. Every change is read back before it is saved, and made under
+editing(), so two of them at once never lose one's change.
 """
 
+import contextlib
 import dataclasses
 import datetime
+import fcntl
 import json
 import os
 import re
 import shlex
 import tomllib
 import zoneinfo
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -353,6 +357,16 @@ def without_job(text: str, name: str) -> str:
         raise ConfigError(f"taking out [jobs.{name}] would change more of the config; take it "
                           "out by hand")
     return new
+
+
+@contextlib.contextmanager
+def editing() -> Iterator[None]:
+    """Held from reading the config's text to saving the change. Kept in the
+    state folder, as the config's folder may be a dotfiles repo."""
+    state_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
+    with open(state_dir() / "config-lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
 
 
 def save(text: str) -> None:

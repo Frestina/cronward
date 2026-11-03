@@ -90,6 +90,12 @@ def claim(cfg: Config, data: dict, now: float) -> tuple[list[tuple[Job, dict]], 
     """Moves each enabled job's `through` to now. Returns the slots to start,
     and the results of missed slots."""
     claimed, missed = [], []
+    names = {job.name for job in cfg.jobs}
+    for name, js in data["jobs"].items():
+        # A job out of the config has no slots: added again, it starts from
+        # then, with nothing reported missed, as a disabled job does.
+        if name not in names and js.get("through") is not None:
+            js["through"] = max(js["through"], now)
     for job in cfg.jobs:
         js = data["jobs"].setdefault(job.name, {"through": None, "notified": None})
         through = js.get("through")
@@ -235,7 +241,8 @@ def run(cfg: Config, make: MakeClient = default_client, now: float | None = None
     saves as it goes. Returns the notices to give."""
     now = time.time() if now is None else now
     clients = Clients(make)
-    with state.locked():
+    # `cronward run` waits for a tick to finish; a tick never waits for anyone.
+    with state.locked(wait=manual is not None):
         data = state.load()
         if manual is None:
             claimed, finished = claim(cfg, data, now)
