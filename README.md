@@ -137,9 +137,12 @@ New jobs start from the next slot, not the past ones. `cronward tick
 
 ### Turned-off workflows
 
-GitHub turns off workflows in public repos after 60 days without activity.
-cronward turns such a workflow back on and tells you (`reenable = false` to
-only be told). A workflow you turned off yourself is never turned on.
+GitHub turns off scheduled workflows in public repos after 60 days without
+activity. Once you take out a workflow's `schedule:` lines, as above, that
+rule no longer applies to it. If it does happen, while the lines are still
+there, cronward turns the workflow back on and tells you (`reenable =
+false` to only be told). A workflow you turned off yourself is never turned
+on.
 
 ## With an agent
 
@@ -163,6 +166,13 @@ back to passed. A job that keeps failing is one notice, not one an hour.
 - A desktop notification on the machine, critical by default so it stays.
 - `notify.command`: any program, given the notice as JSON on stdin, such as
   a script that posts to your phone.
+
+GitHub also emails the token's account about each failed run cronward
+started, as for any run you start, unless you turned that off (GitHub's
+Settings, Notifications, Actions). Those come for every failure;
+cronward's notice comes when the result changes, and also for didn't run,
+such as a missed slot or a refused start, which GitHub cannot tell you
+about.
 
 ### On the machines you sit at
 

@@ -43,7 +43,8 @@ timezone = "UTC"
 # A run that has not finished this long after its start counts as didn't run.
 finish_within = "6h"
 
-# GitHub turns off workflows in public repos after 60 days without activity.
+# GitHub turns off scheduled workflows in public repos after 60 days without
+# activity; once a workflow's schedule: lines are out, it no longer applies.
 # true: cronward turns such a workflow back on and tells you. false: it only
 # tells you. A workflow you turned off yourself is never turned on.
 reenable = true
