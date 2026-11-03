@@ -1,4 +1,5 @@
 import io
+import types
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
@@ -148,8 +149,11 @@ class RunWaitTest(CronwardTest):
         tokens.store("personal", "t0ken")
         self.now = 1_800_000_000.0
         self.gh.clock = self.now
-        for name, fake in (("time.time", lambda: self.now), ("time.sleep", self.sleep)):
-            patch = mock.patch(name, side_effect=fake)
+        # Only cronward's own clock: subprocess sleeps too while it waits for
+        # a child, and must not finish the run before it has started.
+        clock = types.SimpleNamespace(time=lambda: self.now, sleep=self.sleep)
+        for module in ("cronward.cli", "cronward.tick"):
+            patch = mock.patch(f"{module}.time", clock)
             patch.start()
             self.addCleanup(patch.stop)
         self.on_sleep = None
