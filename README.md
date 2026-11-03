@@ -242,6 +242,8 @@ The `XDG_*_HOME` variables move them. [SPEC.md](SPEC.md) has every rule.
 - **What runs on your machine**: cronward itself. Not a runner, so a pull
   request to a public repo can never run code here.
 
+To report a security problem, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT
