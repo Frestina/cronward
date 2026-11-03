@@ -3,16 +3,20 @@
     cronward init                        write the example config
     cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it
     cronward workflows ACCOUNT           the repos and workflows the token can reach
+    cronward add JOB --repo R --workflow W --schedule CRON
+                                         check a job with GitHub, then add it to the config
+    cronward remove JOB                  take a job out of the config
     cronward doctor                      check config, tokens, repos, workflows and timer
     cronward status [--json]             each job's latest result and next slot
-    cronward run JOB                     start a job now
+    cronward run JOB [--wait [TIME]]     start a job now, and with --wait, say how it went
     cronward tick [--dry-run]            what the timer runs
     cronward watch HOST                  what a viewer's timer runs
     cronward install [--viewer HOST]     the user timer, on the main machine or a viewer
     cronward uninstall                   remove the timers
 
 Exit codes: 0 fine, 1 a job's latest result is not passed (status), the start
-did not go through (run), a check failed (doctor) or the main machine was not
+did not go through or with --wait the run did not pass (run), GitHub's check
+refused the job (add), a check failed (doctor) or the main machine was not
 reached (watch), 2 an error.
 """
 
@@ -20,9 +24,10 @@ import argparse
 import getpass
 import json
 import sys
+import time
 import traceback
 
-from cronward import config, doctor, notify, state, status, tick, timers, tokens
+from cronward import config, cron, doctor, notify, state, status, tick, timers, tokens
 from cronward.config import ConfigError
 from cronward.github import Client, GitHubError, HTTPProblem
 
@@ -41,11 +46,31 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("account")
     p = sub.add_parser("workflows", help="the repos and workflows a token can reach")
     p.add_argument("account")
+    p = sub.add_parser("add", help="check a job with GitHub, then add it to the config")
+    p.add_argument("job", help="the job's name, used by commands and in notices")
+    p.add_argument("--repo", required=True, metavar="OWNER/NAME")
+    p.add_argument("--workflow", required=True, metavar="FILE",
+                   help="its file name under .github/workflows, or its ID")
+    p.add_argument("--schedule", required=True, metavar="CRON",
+                   help='5 fields, as in GitHub\'s schedule, such as "0 6 * * *"')
+    p.add_argument("--account", help="default: the account whose token reaches the repo")
+    p.add_argument("--ref", help="branch or tag to run; default: the repo's default branch")
+    p.add_argument("--timezone", help='for the schedule; default: the config\'s, "UTC" unless '
+                                      "set")
+    p.add_argument("--finish-within", metavar="TIME",
+                   help='a run not finished by then didn\'t run, such as "2h"')
+    p.add_argument("--input", action="append", default=[], metavar="KEY=VALUE",
+                   help="an input for the workflow; give it again for more")
+    p = sub.add_parser("remove", help="take a job out of the config")
+    p.add_argument("job")
     sub.add_parser("doctor", help="check config, tokens, repos, workflows and timer")
     p = sub.add_parser("status", help="each job's latest result and next slot")
     p.add_argument("--json", action="store_true", help="exact data, for scripts")
     p = sub.add_parser("run", help="start a job now, outside its schedule")
     p.add_argument("job")
+    p.add_argument("--wait", nargs="?", const="", metavar="TIME",
+                   help="follow the run to its end, at most TIME (default: the job's "
+                        "finish_within), and exit 0 only if it passed")
     p = sub.add_parser("tick", help="what the timer runs every 5 minutes")
     p.add_argument("--dry-run", action="store_true",
                    help="say what is due, and change nothing")
@@ -159,19 +184,160 @@ def cmd_status(as_json: bool) -> int:
     return EXIT_OK if status.all_passed(st) else EXIT_NOT_PASSED
 
 
-def cmd_run(name: str) -> int:
+TOKENS_PAGE = "https://github.com/settings/personal-access-tokens"
+
+
+class CheckFailed(Exception):
+    """GitHub's answers say the job would not run; says why."""
+
+
+def _account_for(accounts: tuple[str, ...], repo: str) -> tuple[str, Client]:
+    """The one account of these whose token reaches repo. ConfigError when
+    several do, CheckFailed when none does."""
+    reached, refused = [], []
+    for account in accounts:
+        try:
+            client = tick.default_client(account)
+            client.repo(repo)
+        except tokens.TokenError as e:
+            refused.append(f"{account}: {e}")
+        except HTTPProblem as e:
+            refused.append(f"{account}: " + ("the token cannot see the repo" if e.status == 404
+                                             else str(e)))
+        else:
+            reached.append((account, client))
+    if len(reached) > 1:
+        raise ConfigError(f"the tokens of {', '.join(a for a, _ in reached)} all reach {repo}; "
+                          "say which with --account")
+    if not reached:
+        raise CheckFailed("\n".join([
+            f"no account's token reaches {repo}:", *(f"  {r}" for r in refused),
+            f"Add {repo} to the token's repository access at {TOKENS_PAGE} (Actions: read and "
+            "write), or store a token with: cronward token set <account>. Then run this again.",
+        ]))
+    return reached[0]
+
+
+def _check(client: Client, repo: str, workflow: str, reenable: bool) -> str:
+    """The workflow's state, when cronward can start it; CheckFailed if not."""
+    try:
+        wf = client.workflow(repo, workflow)
+    except HTTPProblem as e:
+        if e.status != 404:
+            raise CheckFailed(str(e)) from None
+        try:
+            files = [str(w.get("path", "")).rsplit("/", 1)[-1] for w in client.workflows(repo)]
+        except GitHubError:
+            files = []
+        raise CheckFailed(f"{workflow} is not a workflow on {repo}'s default branch, and a new "
+                          "workflow file must be there before it can be started"
+                          + (f". There are: {', '.join(files)}" if files else "")) from None
+    wf_state = wf.get("state")
+    if wf_state == "disabled_manually":
+        raise CheckFailed("the workflow is turned off in GitHub; turn it on there first")
+    if wf_state == "disabled_inactivity" and not reenable:
+        raise CheckFailed("GitHub turned the workflow off for inactivity, and reenable is off; "
+                          "turn it on in GitHub first")
+    if wf_state not in ("active", "disabled_inactivity"):
+        raise CheckFailed(f"GitHub says the workflow is {wf_state}")
+    return wf_state
+
+
+def cmd_add(a: argparse.Namespace) -> int:
+    path = config.config_path()
+    try:
+        text = path.read_text()
+    except FileNotFoundError:
+        raise ConfigError(f"no config at {path}; write one with: cronward init") from None
+    cfg = config.parse(text, str(path))
+    if any(j.name == a.job for j in cfg.jobs):
+        raise ConfigError(f"there is a job {a.job} already; take it out first with: "
+                          f"cronward remove {a.job}")
+    if not cfg.accounts:
+        raise ConfigError(f"no accounts in {path}: add [accounts.<name>], then store its token "
+                          "with: cronward token set <name>")
+    if a.account is not None and a.account not in cfg.accounts:
+        raise ConfigError(f"no account {a.account!r} in {path}; there are: "
+                          f"{', '.join(cfg.accounts)}")
+    settings: dict[str, object] = {"repo": a.repo, "workflow": a.workflow,
+                                   "schedule": a.schedule}
+    for key, value in (("ref", a.ref), ("timezone", a.timezone),
+                       ("finish_within", a.finish_within)):
+        if value is not None:
+            settings[key] = value
+    inputs = {}
+    for item in a.input:
+        key, eq, value = item.partition("=")
+        if not eq or not key:
+            raise ConfigError(f"--input {item!r} is not KEY=VALUE")
+        inputs[key] = value
+    if inputs:
+        settings["inputs"] = inputs
+    # Read back once before GitHub is asked, so a wrong value is said first.
+    config.with_job(text, a.job, {"account": a.account or cfg.accounts[0], **settings})
+    try:
+        account, client = _account_for((a.account,) if a.account else cfg.accounts, a.repo)
+        wf_state = _check(client, a.repo, a.workflow, cfg.reenable)
+    except CheckFailed as e:
+        print(f"cronward: {notify.clean(e)}\nNothing was added.", file=sys.stderr)
+        return EXIT_NOT_PASSED
+    except GitHubError as e:
+        print(f"cronward: cannot check with GitHub: {notify.clean(e)}\nNothing was added.",
+              file=sys.stderr)
+        return EXIT_ERROR
+    new = config.with_job(text, a.job, {"account": account, **settings})
+    config.save(new)
+    job = config.parse(new).job(a.job)
+    print(f"added {job.name} to {path}: {job.repo} {job.workflow}, {job.schedule.text} "
+          f"{job.zone_name}, account {account}")
+    if wf_state == "disabled_inactivity":
+        print("note: GitHub turned the workflow off for inactivity; the first start turns it "
+              "back on")
+    print(f"next slot: {status.when(cron.next_slot(job.schedule, job.zone, time.time()))}")
+    print(f"try it now with: cronward run {job.name} --wait")
+    return EXIT_OK
+
+
+def cmd_remove(name: str) -> int:
+    path = config.config_path()
+    try:
+        text = path.read_text()
+    except FileNotFoundError:
+        raise ConfigError(f"no config at {path}") from None
+    config.parse(text, str(path)).job(name)
+    config.save(config.without_job(text, name))
+    print(f"removed {name} from {path}")
+    print("If GitHub should run the workflow on its own again, put its `schedule:` back.")
+    return EXIT_OK
+
+
+def cmd_run(name: str, wait: str | None) -> int:
     cfg = config.load()
     job = cfg.job(name)
-    notify.send(tick.run(cfg, manual=job), cfg)
-    rec = state.latest(state.load(), job.name, final=False)
+    limit = config.duration(wait, "--wait") if wait else job.finish_within
+    now = time.time()
+    notify.send(tick.run(cfg, manual=job, now=now), cfg)
+    rec = next((r for r in state.load()["results"]
+                if r["job"] == job.name and r["slot"] == now), None)
     if rec and rec["kind"] == state.PENDING:
         print(f"started {job.name}: "
               f"{notify.clean(rec.get('url') or 'looking for the run on GitHub')}")
-        print("the next tick follows it to its end; see `cronward status`")
-        return EXIT_OK
-    if rec:
-        print(f"{job.name} {state.WORDS[rec['kind']]}: {notify.clean(rec['reason'])}")
-    return EXIT_NOT_PASSED
+        if wait is None:
+            print("the next tick follows it to its end; see `cronward status`")
+            return EXIT_OK
+        print(f"waiting up to {tick.span(limit)} for it to end")
+        rec, notices = tick.wait(cfg, job, now, now + limit)
+        notify.send(notices, cfg)
+        if rec and rec["kind"] == state.PENDING:
+            print(f"{job.name} is still running after {tick.span(limit)}; the tick follows it "
+                  "to its end, see `cronward status`")
+            return EXIT_NOT_PASSED
+    if rec is None:
+        return EXIT_NOT_PASSED
+    line = f"{job.name} {state.WORDS[rec['kind']]}" + (f": {rec['reason']}" if rec["reason"]
+                                                        else "")
+    print(notify.clean(line + (f"\n{rec['url']}" if rec.get("url") else "")))
+    return EXIT_OK if rec["kind"] == state.PASSED else EXIT_NOT_PASSED
 
 
 def cmd_tick(dry: bool) -> int:
@@ -213,8 +379,12 @@ def main(argv: list[str] | None = None) -> int:
             return doctor.run()
         if args.cmd == "status":
             return cmd_status(args.json)
+        if args.cmd == "add":
+            return cmd_add(args)
+        if args.cmd == "remove":
+            return cmd_remove(args.job)
         if args.cmd == "run":
-            return cmd_run(args.job)
+            return cmd_run(args.job, args.wait)
         if args.cmd == "tick":
             return cmd_tick(args.dry_run)
         if args.cmd == "watch":

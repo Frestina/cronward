@@ -272,6 +272,33 @@ def run(cfg: Config, make: MakeClient = default_client, now: float | None = None
     return notices
 
 
+def wait(cfg: Config, job: Job, slot: float, until: float, make: MakeClient = default_client,
+         every: float = 15) -> tuple[dict | None, list[dict]]:
+    """Follows the result `cronward run` started for slot until it is final, or
+    until `until`. Returns the result as it stands, and the notices to give.
+    Takes the lock for each look only, so ticks go on meanwhile; a tick that
+    makes the result final gives its notices itself."""
+    clients = Clients(make)
+    while True:
+        now = time.time()
+        with state.locked(wait=True):
+            data = state.load()
+            rec = next((r for r in data["results"]
+                        if r["job"] == job.name and r["slot"] == slot), None)
+            if rec is None or rec["kind"] != PENDING:
+                return rec, []
+            follow(job, rec, clients, data, now)
+            done = rec["kind"] != PENDING
+            notices = notify.decide(cfg, data, [rec], now) if done else []
+            state.save(data)
+            if done:
+                status.write(cfg, data)
+                return rec, notices
+        if now >= until:
+            return rec, []
+        time.sleep(every)
+
+
 def failed(cfg: Config, why: str) -> list[dict]:
     """Records a tick that failed, so status and viewers show it. Returns a
     notice the first time this error is seen since the last tick that worked."""

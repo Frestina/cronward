@@ -58,6 +58,13 @@ Only `success` is passed. Nothing unknown is ever shown as passed.
 `~/.config/cronward/config.toml` (`$XDG_CONFIG_HOME`). `cronward init`
 writes a commented example. Unknown keys are errors, so a typo is caught.
 
+`cronward add` adds a job, and `cronward remove` takes one out. Both change
+the file's text, so its comments stay, write through a symlink, and read the
+result back before saving it. `add` first asks GitHub whether an account's
+token reaches the repo and whether the workflow is there and can be started.
+Without `--account` it takes the one account whose token reaches the repo.
+When none does, it says where to give the token access, and adds nothing.
+
 ```toml
 timezone = "UTC"        # default. Or "local", or an IANA name like "Europe/Oslo"
 finish_within = "6h"    # default for every job: a run not finished by then didn't run
@@ -160,7 +167,10 @@ Then, for every pending result:
 
 `cronward tick --dry-run` prints what is due and why, and changes nothing.
 `cronward run <job>` starts a job now, outside its schedule, recorded as a
-manual slot.
+manual slot. With `--wait [TIME]` it follows the run to its end, for at most
+TIME or the job's `finish_within`, gives the notice a tick would, and exits
+0 only if the run passed. A run still going at the limit is left to the
+ticks.
 
 The state (`~/.local/state/cronward/state.json`) holds each job's `through`
 time, the last 50 results of each job, and each account's token expiry. A
@@ -216,17 +226,34 @@ The minute keeps clear of Fleet's timers (fleetdoctor on the hour and at
 | `cronward token set <account>` | Check and store a token, read from stdin |
 | `cronward token remove <account>` | Delete a stored token |
 | `cronward workflows <account>` | The repos and workflows the token can reach |
+| `cronward add <job> --repo R --workflow W --schedule C` | Check a job with GitHub, then add it to the config |
+| `cronward remove <job>` | Take a job out of the config |
 | `cronward doctor` | Check config, tokens, repos, workflows, timer and lingering |
 | `cronward status [--json]` | Each job's latest result and next slot, and the last tick |
-| `cronward run <job>` | Start a job now |
+| `cronward run <job> [--wait [TIME]]` | Start a job now, and with `--wait`, say how it went |
 | `cronward tick [--dry-run]` | What the timer runs |
 | `cronward watch <host>` | What a viewer's timer runs |
 | `cronward install [--viewer <host>]` | The user timer, on the main machine or a viewer |
 | `cronward uninstall` | Remove the timers; config, tokens and state stay |
 
 Exit codes: 0 fine, 1 a job's latest result is not passed (status), the
-start did not go through (run), a check failed (doctor), or the main
+start did not go through or with `--wait` the run did not pass (run),
+GitHub's check refused the job (add), a check failed (doctor), or the main
 machine was not reached (watch), 2 an error.
+
+## Agents
+
+[skills/cronward/SKILL.md](skills/cronward/SKILL.md) tells an agent working
+in any repo how to put one of its workflows on cronward: make it startable,
+`add` it, test it with `run --wait`, then take out its `schedule:`. It is an
+Agent Skill (a folder with a SKILL.md), so agents that read skills find it,
+and any other agent can be told to read the file. `install.sh` links it into
+`~/.agents/skills` and `~/.claude/skills` when those folders are there.
+
+An agent never handles a token: when one is missing or lacks access, the
+skill has it tell the user what to do and stop. Change the skill in the same
+commit as the commands it describes.
+
 
 ## Requirements
 

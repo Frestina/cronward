@@ -40,7 +40,7 @@ Needs Linux with systemd and Python 3.11 or newer. Nothing else.
 
 ```sh
 git clone https://github.com/Frestina/cronward ~/Projects/cronward
-~/Projects/cronward/install.sh   # links cronward into ~/.local/bin
+~/Projects/cronward/install.sh   # links cronward into ~/.local/bin, and the agent skill
 cronward init                     # writes ~/.config/cronward/config.toml
 ```
 
@@ -65,20 +65,24 @@ cronward token set personal
 
 ### 2. Jobs
 
-Each workflow needs `workflow_dispatch:` under `on:`. Then add it to the
-config:
+Each workflow needs `workflow_dispatch:` under `on:`, on its default
+branch. Then add it:
 
-```toml
-[jobs.nightly-check]
-account = "personal"
-repo = "me/weather-widget"
-workflow = "check.yml"
-schedule = "0 6 * * *"     # copy the cron line from the workflow
-# timezone = "Europe/Oslo" # default UTC, as on GitHub
+```sh
+cronward add nightly-check --repo me/weather-widget --workflow check.yml \
+  --schedule "0 6 * * *"     # copy the cron line from the workflow
 ```
 
+`add` checks with GitHub that a token reaches the repo and that the workflow
+is there, then writes the job into the config. The time zone is UTC, as on
+GitHub, unless you pass `--timezone Europe/Oslo` or set it in the config;
+`cronward add --help` has the other options. You can also write a
+`[jobs.<name>]` table into the config yourself: every setting is explained
+in the file `cronward init` wrote. `cronward remove nightly-check` takes a
+job out again.
+
 `cronward workflows personal` lists the repos and workflows the token can
-reach. Every setting is explained in the file `cronward init` wrote.
+reach.
 
 Once cronward runs a workflow, remove its `schedule:` lines, or the days
 GitHub does fire give you a second run.
@@ -87,7 +91,7 @@ GitHub does fire give you a second run.
 
 ```sh
 cronward doctor     # config, tokens, repos, workflows, timer
-cronward run nightly-check   # try one now
+cronward run nightly-check --wait   # start one now, and wait to see it pass
 cronward install    # the timer: every 5 minutes, at :01, :06, ...
 ```
 
@@ -116,6 +120,20 @@ New jobs start from the next slot, not the past ones. `cronward tick
 GitHub turns off workflows in public repos after 60 days without activity.
 cronward turns such a workflow back on and tells you (`reenable = false` to
 only be told). A workflow you turned off yourself is never turned on.
+
+## With an agent
+
+The repo has an Agent Skill, [skills/cronward](skills/cronward/SKILL.md),
+that `install.sh` links into `~/.agents/skills` and `~/.claude/skills` when
+those folders are there. Then you can ask the agent working in a repo to
+"put check.yml on cronward, daily at 06:00". It adds `workflow_dispatch:`,
+runs `cronward add`, tests the job with `cronward run --wait`, and takes out
+the workflow's `schedule:` once a run has passed. It works over ssh when
+cronward runs on another machine.
+
+An agent never handles your token. When the token can't reach the repo yet,
+it tells you where to add the repo, and waits. For an agent that does not
+read skills, tell it to read `skills/cronward/SKILL.md`.
 
 ## Being told
 
@@ -149,16 +167,20 @@ and again when that is over. The viewer needs no config and no token.
 cronward init                        write the example config
 cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it
 cronward workflows ACCOUNT           the repos and workflows the token can reach
+cronward add JOB --repo R --workflow W --schedule CRON
+                                     check a job with GitHub, then add it to the config
+cronward remove JOB                  take a job out of the config
 cronward doctor                      check config, tokens, repos, workflows and timer
 cronward status [--json]             each job's latest result and next slot
-cronward run JOB                     start a job now
+cronward run JOB [--wait [TIME]]     start a job now, and with --wait, say how it went
 cronward tick [--dry-run]            what the timer runs
 cronward watch HOST                  what a viewer's timer runs
 cronward install [--viewer HOST]     the user timer, on this machine or a viewer
 cronward uninstall                   remove the timers (config, tokens and state stay)
 ```
 
-`status` exits 1 when a job's latest result is not passed, for scripts.
+`status` exits 1 when a job's latest result is not passed, and `run --wait`
+when the run did not pass, for scripts.
 
 ## Files
 
