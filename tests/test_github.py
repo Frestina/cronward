@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 from unittest import mock
 
-from cronward import github
+from cronward import __version__, github
 from tests.harness import EXPIRES, REPO, FakeGitHub
 
 
@@ -26,6 +26,7 @@ class ClientTest(unittest.TestCase):
         self.assertEqual(client.user()["login"], "me")
         self.assertEqual(seen[0]["Authorization"], "Bearer t0ken")
         self.assertEqual(seen[0]["X-GitHub-Api-Version"], github.VERSION)
+        self.assertEqual(seen[0]["User-Agent"], f"cronward/{__version__}")
         self.assertEqual(client.expires, EXPIRES)
 
     def test_reads_are_retried_on_5xx(self):

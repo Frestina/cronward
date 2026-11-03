@@ -13,6 +13,7 @@
     cronward watch HOST                  what a viewer's timer runs
     cronward install [--viewer HOST]     the user timer, on the main machine or a viewer
     cronward uninstall                   remove the timers
+    cronward --version                   which cronward this is
 
 Exit codes: 0 fine, 1 a job's latest result is not passed (status), the start
 did not go through or with --wait the run did not pass (run), GitHub's check
@@ -27,7 +28,7 @@ import sys
 import time
 import traceback
 
-from cronward import config, cron, doctor, notify, state, status, tick, timers, tokens
+from cronward import __version__, config, cron, doctor, notify, state, status, tick, timers, tokens
 from cronward.config import ConfigError
 from cronward.github import Client, GitHubError, HTTPProblem
 
@@ -39,6 +40,7 @@ def parser() -> argparse.ArgumentParser:
         prog="cronward",
         description="Starts GitHub Actions workflows on a schedule from this machine, and "
                     "says whether they passed.")
+    out.add_argument("--version", action="version", version=f"cronward {__version__}")
     sub = out.add_subparsers(dest="cmd", metavar="COMMAND", required=True)
     sub.add_parser("init", help="write the example config")
     p = sub.add_parser("token", help="store or delete an account's token")

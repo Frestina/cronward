@@ -235,6 +235,7 @@ The minute keeps clear of Fleet's timers (fleetdoctor on the hour and at
 | `cronward watch <host>` | What a viewer's timer runs |
 | `cronward install [--viewer <host>]` | The user timer, on the main machine or a viewer |
 | `cronward uninstall` | Remove the timers; config, tokens and state stay |
+| `cronward --version` | Which cronward this is |
 
 Exit codes: 0 fine, 1 a job's latest result is not passed (status), the
 start did not go through or with `--wait` the run did not pass (run),
@@ -262,6 +263,16 @@ timers, and a user manager that keeps running: lingering, or an autologin
 session. `install` and `doctor` say when neither is there, and never turn
 lingering on themselves. The services run at low priority (Nice, idle IO, a
 memory and time limit), so they don't disturb other work on the machine.
+
+## Versions
+
+The version is `__version__` in `cronward/__init__.py`. `--version`, the
+first line of `doctor` and the User-Agent sent to GitHub
+(`cronward/<version>`) all say it. A release is a tag `vX.Y.Z` on main with
+notes on what changed. Before 1.0, the minor number goes up when an update
+needs something from the user (a config change, or `cronward install`
+again), and the patch number otherwise. A new version reads the config and
+state.json an older one wrote.
 
 ## Not in v1
 

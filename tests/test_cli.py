@@ -4,7 +4,7 @@ import time
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
-from cronward import cli, config, state, tokens
+from cronward import __version__, cli, config, state, tokens
 from tests.harness import EXPIRES, JOB, REPO, CronwardTest
 
 
@@ -123,10 +123,18 @@ class CliTest(CronwardTest):
         self.assertEqual(titles, [["cronward: a tick failed"], [], [],
                                   ["cronward: a tick failed"]])
 
+    def test_version(self):
+        out = io.StringIO()
+        with redirect_stdout(out), self.assertRaises(SystemExit) as e:
+            cli.main(["--version"])
+        self.assertEqual(e.exception.code, 0)
+        self.assertEqual(out.getvalue(), f"cronward {__version__}\n")
+
     def test_doctor(self):
         self.config()
         rc, out, _ = self.run_cli("doctor")
         self.assertEqual(rc, 1)
+        self.assertIn(f"ok    cronward {__version__}, Python ", out)
         self.assertIn("FAIL  account personal: no token", out)
         tokens.store("personal", "t0ken")
         rc, out, _ = self.run_cli("doctor")

@@ -99,6 +99,18 @@ User timers stop when you log out, unless lingering is on
 (`loginctl enable-linger`) or a session stays logged in. `cronward install`
 tells you which.
 
+### Updating
+
+```sh
+cd ~/Projects/cronward && git pull --ff-only && ./install.sh
+cronward install    # again, so the timer gets any change to its units
+cronward doctor     # its first line says which cronward this is
+```
+
+Releases are tagged `vX.Y.Z` with notes on what changed, and `cronward
+--version` says which one you run. On a viewer, `cronward install --viewer
+HOST` instead.
+
 ## What it does
 
 Every 5 minutes, `cronward tick`:
@@ -177,6 +189,7 @@ cronward tick [--dry-run]            what the timer runs
 cronward watch HOST                  what a viewer's timer runs
 cronward install [--viewer HOST]     the user timer, on this machine or a viewer
 cronward uninstall                   remove the timers (config, tokens and state stay)
+cronward --version                   which cronward this is
 ```
 
 `status` exits 1 when a job's latest result is not passed, and `run --wait`
