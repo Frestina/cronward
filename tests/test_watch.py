@@ -1,8 +1,10 @@
 import json
+import time
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from unittest import mock
 
-from cronward import config, notify, state, status
+from cronward import cli, config, notify, state, status
 from tests.harness import REPO, CronwardTest, at
 
 NOW = at("2026-11-03 07:08")
@@ -13,14 +15,20 @@ def rec(slot, kind, reason=""):
             "url": "https://github.com/me/widget/actions/runs/1"}
 
 
-class WatchTest(CronwardTest):
+class ViewerTest(CronwardTest):
+    """A main machine anvil, reached through the fake ssh."""
+
     def main_status(self, recent, last_tick=NOW - 120, error=None):
         path = self.root / "homes" / "anvil" / ".local/state/cronward/status.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({
             "schema": status.SCHEMA, "host": "anvil", "now": NOW, "last_tick": last_tick,
             "tick_error": error, "accounts": [],
-            "jobs": [{"name": "check", "repo": REPO, "workflow": "check.yml",
+            "jobs": [{"name": "check", "account": "personal", "repo": REPO,
+                      "workflow": "check.yml", "schedule": "0 6 * * *", "timezone": "UTC",
+                      "enabled": True, "next": at("2026-11-04 06:00"), "running": None,
+                      "latest": next((r for r in reversed(recent)
+                                      if r["kind"] != state.PENDING), None),
                       "recent": recent}]}))
 
     def watch(self, now=NOW):
@@ -31,6 +39,8 @@ class WatchTest(CronwardTest):
             p.unlink()
         return rc, titles
 
+
+class WatchTest(ViewerTest):
     def test_first_watch_tells_only_the_latest_result_if_not_passed(self):
         self.main_status([rec("2026-11-01 06:00", "failed"), rec("2026-11-02 06:00", "failed"),
                           rec("2026-11-03 06:00", "didnt_run", "the run ended cancelled")])
@@ -96,3 +106,91 @@ class WatchTest(CronwardTest):
         self.main_status([rec("2026-11-01 06:00", "failed"), rec("2026-11-02 06:00", "passed"),
                           rec("2026-11-03 06:00", "failed")])
         self.assertEqual(self.watch()[1], ["cronward: check failed"])
+
+
+class StatusHostTest(ViewerTest):
+    """`cronward status --host anvil`: the copy watch kept."""
+
+    def status(self, *more, now=NOW + 600):
+        out, err = StringIO(), StringIO()
+        with mock.patch.object(time, "time", lambda: now), redirect_stdout(out), \
+                redirect_stderr(err):
+            rc = cli.main(["status", "--host", "anvil", *more])
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_no_copy_yet(self):
+        rc, out, err = self.status()
+        self.assertEqual((rc, out), (2, ""))
+        self.assertIn("no status from anvil yet: it is fetched hourly at :08, or now with: "
+                      "cronward watch anvil", err)
+        self.watch()  # anvil has no home: unreachable
+        rc, out, err = self.status()
+        self.assertEqual(rc, 2)
+        self.assertIn("(last try: cannot reach anvil: ", err)
+
+    def test_the_copy_with_its_viewer_object(self):
+        self.main_status([rec("2026-11-03 06:00", "passed")])
+        self.watch()
+        rc, out, _ = self.status("--json")
+        self.assertEqual(rc, 0)
+        st = json.loads(out)
+        self.assertEqual(st["jobs"][0]["latest"]["kind"], "passed")
+        self.assertEqual(st["viewer"], {"host": "anvil", "fetched": NOW, "error": None,
+                                        "offline": False, "unreachable_since": None,
+                                        "stopped_ticking": False})
+        rc, out, _ = self.status()
+        self.assertEqual(rc, 0)
+        self.assertIn(f"as of {status.when(NOW)} (10 min ago), from anvil\n", out)
+        self.assertIn("passed: slot", out)
+        self.assertNotIn("cannot reach", out)
+
+    def test_a_failed_job_exits_1(self):
+        self.main_status([rec("2026-11-03 06:00", "failed")])
+        self.watch()
+        self.assertEqual(self.status()[0], 1)
+
+    def test_unreachable_keeps_the_old_copy_and_says_since_when(self):
+        self.main_status([rec("2026-11-03 06:00", "passed")])
+        self.watch()
+        (self.root / "homes" / "anvil" / ".local/state/cronward/status.json").unlink()
+        self.watch(NOW + 3600)
+        rc, out, _ = self.status("--json", now=NOW + 3700)
+        self.assertEqual(rc, 1)
+        v = json.loads(out)["viewer"]
+        self.assertEqual((v["fetched"], v["unreachable_since"]), (NOW, NOW + 3600))
+        self.assertIn("has no cronward status", v["error"])
+        rc, out, _ = self.status(now=NOW + 3700)
+        self.assertIn(f"cannot reach anvil since {status.when(NOW + 3600)}: anvil has no "
+                      "cronward status", out)
+        self.main_status([rec("2026-11-03 06:00", "passed")], last_tick=NOW + 7100)
+        self.watch(NOW + 7200)
+        v = json.loads(self.status("--json", now=NOW + 7300)[1])["viewer"]
+        self.assertEqual((v["fetched"], v["error"], v["unreachable_since"]),
+                         (NOW + 7200, None, None))
+
+    def test_a_main_machine_that_stopped_ticking_exits_1(self):
+        self.main_status([rec("2026-11-03 06:00", "passed")], last_tick=NOW - 3600)
+        self.watch()
+        rc, out, _ = self.status()
+        self.assertEqual(rc, 1)
+        self.assertIn("anvil has stopped ticking", out)
+        self.assertTrue(json.loads(self.status("--json")[1])["viewer"]["stopped_ticking"])
+
+    def test_offline_keeps_the_copy_and_says_so(self):
+        self.main_status([rec("2026-11-03 06:00", "passed")])
+        self.watch()
+        (self.root / "offline").touch()
+        self.watch(NOW + 3600)
+        rc, out, _ = self.status(now=NOW + 3700)
+        self.assertEqual(rc, 0)
+        self.assertIn("this machine is offline", out)
+        v = json.loads(self.status("--json")[1])["viewer"]
+        self.assertEqual((v["offline"], v["fetched"], v["unreachable_since"]),
+                         (True, NOW, None))
+
+    def test_control_characters_in_the_copy_are_dropped(self):
+        self.main_status([rec("2026-11-03 06:00", "failed", "bad\x1b[31m news")])
+        self.watch()
+        out = self.status()[1]
+        self.assertIn("bad[31m news", out)
+        self.assertNotIn("\x1b", out)

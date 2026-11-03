@@ -8,6 +8,7 @@
     cronward remove JOB                  take a job out of the config
     cronward doctor                      check config, tokens, repos, workflows and timer
     cronward status [--json]             each job's latest result and next slot
+    cronward status --host HOST [--json] the same, as a viewer last fetched it from HOST
     cronward run JOB [--wait [TIME]]     start a job now, and with --wait, say how it went
     cronward tick [--dry-run]            what the timer runs
     cronward watch HOST                  what a viewer's timer runs
@@ -15,7 +16,8 @@
     cronward uninstall                   remove the timers
     cronward --version                   which cronward this is
 
-Exit codes: 0 fine, 1 a job's latest result is not passed (status), the start
+Exit codes: 0 fine, 1 a job's latest result is not passed, or with --host the
+main machine cannot be reached or has stopped ticking (status), the start
 did not go through or with --wait the run did not pass (run), GitHub's check
 refused the job (add), a check failed (doctor) or the main machine was not
 reached (watch), 2 an error.
@@ -70,6 +72,8 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="check config, tokens, repos, workflows and timer")
     p = sub.add_parser("status", help="each job's latest result and next slot")
     p.add_argument("--json", action="store_true", help="exact data, for scripts")
+    p.add_argument("--host", help="on a viewer: the status it last fetched from HOST, the "
+                                  "main machine")
     p = sub.add_parser("run", help="start a job now, outside its schedule")
     p.add_argument("job")
     p.add_argument("--wait", nargs="?", const="", metavar="TIME",
@@ -184,14 +188,22 @@ def cmd_workflows(account: str) -> int:
     return EXIT_OK
 
 
-def cmd_status(as_json: bool) -> int:
-    cfg = config.load()
-    st = status.build(cfg, state.load())
+def cmd_status(as_json: bool, host: str | None) -> int:
+    if host is None:
+        st = status.build(config.load(), state.load())
+        now = None
+    else:
+        try:
+            st = notify.copy(host)
+        except notify.NoCopy as e:
+            print(f"cronward: {e}", file=sys.stderr)
+            return EXIT_ERROR
+        now = time.time()
     if as_json:
         json.dump(st, sys.stdout, indent=1, sort_keys=True)
         print()
     else:
-        print(notify.clean(status.text(st)))
+        print(notify.clean(status.text(st, now)))
     return EXIT_OK if status.all_passed(st) else EXIT_NOT_PASSED
 
 
@@ -399,7 +411,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "doctor":
             return doctor.run()
         if args.cmd == "status":
-            return cmd_status(args.json)
+            return cmd_status(args.json, args.host)
         if args.cmd == "add":
             return cmd_add(args)
         if args.cmd == "remove":

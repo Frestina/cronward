@@ -116,7 +116,11 @@ Jobs live on the main machine, which holds the config and the tokens. Run
   `didnt_run`, with `reason` and `url`), `running` (a run still going),
   and `next` (a Unix time). `last_tick` and `tick_error` say whether the
   timer works. `cronward doctor` checks everything and marks problems
-  `FAIL`.
+  `FAIL`. On a viewer, `cronward status --host <host> --json` shows the
+  status it last fetched, with no ssh: its `viewer` object says when
+  (`fetched`), and whether the main machine could not be reached
+  (`unreachable_since`, `error`) or had stopped ticking. `cronward watch
+  <host>` fetches it again.
 - **Take a job off:** `cronward remove <job>`. Put `schedule:` back in the
   workflow if GitHub should run it on its own again.
 - **Change a job:** `cronward remove <job>`, then `cronward add` it again

@@ -236,6 +236,10 @@ same notices, plus:
 
 and again when that is over. The viewer needs no config and no token.
 
+To look rather than wait for a notice, `cronward status --host homeserver`
+shows what the viewer last fetched, and when. `cronward watch homeserver`
+fetches it now.
+
 ## Commands
 
 ```
@@ -247,6 +251,7 @@ cronward add JOB --repo R --workflow W --schedule CRON
 cronward remove JOB                  take a job out of the config
 cronward doctor                      check config, tokens, repos, workflows and timer
 cronward status [--json]             each job's latest result and next slot
+cronward status --host HOST [--json] the same, as a viewer last fetched it from HOST
 cronward run JOB [--wait [TIME]]     start a job now, and with --wait, say how it went
 cronward tick [--dry-run]            what the timer runs
 cronward watch HOST                  what a viewer's timer runs
@@ -266,6 +271,7 @@ when the run did not pass, for scripts.
 | `~/.local/share/cronward/tokens/` | the tokens, encrypted from systemd 256 |
 | `~/.local/state/cronward/state.json` | claims, run IDs, the last 50 results of each job |
 | `~/.local/state/cronward/status.json` | what `status --json` shows, written every tick |
+| `~/.local/state/cronward/status-HOST.json` | on a viewer: the status it last fetched from HOST |
 
 The `XDG_*_HOME` variables move them. [SPEC.md](SPEC.md) has every rule.
 

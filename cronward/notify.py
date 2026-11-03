@@ -14,7 +14,9 @@ tick goes on.
 On a viewer, `cronward watch <host>` reads the main machine's status.json
 over one ssh call and gives the same notices, from its own record of what
 it has said, plus the ones about the main machine itself: not ticking, a
-failed tick, or not reachable. See SPEC.md, "Viewers".
+failed tick, or not reachable. It keeps what it fetched as
+status-<host>.json, which `cronward status --host <host>` shows (copy).
+See SPEC.md, "Viewers".
 """
 
 import datetime
@@ -166,9 +168,51 @@ def fetch(host: str) -> dict:
     return data
 
 
+def _safe(host: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.@-]", "_", host)
+
+
 def _viewer_path(host: str):
-    safe = re.sub(r"[^A-Za-z0-9_.@-]", "_", host)
-    return config.state_dir() / f"viewer-{safe}.json"
+    return config.state_dir() / f"viewer-{_safe(host)}.json"
+
+
+def copy_path(host: str):
+    """Where a viewer keeps the main machine's status it last fetched."""
+    return config.state_dir() / f"status-{_safe(host)}.json"
+
+
+class NoCopy(Exception):
+    """No status fetched from the host yet."""
+
+
+def stopped(st: dict, at: float) -> bool:
+    """Whether the main machine had stopped ticking, judged at time at."""
+    tick = st.get("last_tick")
+    return not isinstance(tick, (int, float)) or at - tick > status.STALE
+
+
+def copy(host: str) -> dict:
+    """The status `watch host` last fetched, plus a viewer object saying how
+    fresh it is: {"host", "fetched", "error", "offline", "unreachable_since",
+    "stopped_ticking"}. NoCopy when there is none."""
+    path = copy_path(host)
+    v = _load_viewer(host) or {}
+    try:
+        st = json.loads(path.read_text())
+        fetched = v.get("fetched") or path.stat().st_mtime
+    except FileNotFoundError:
+        tried = f" (last try: {clean(v['error'])})" if v.get("error") else ""
+        raise NoCopy(f"no status from {host} yet{tried}: it is fetched hourly at :08, or now "
+                     f"with: cronward watch {host}") from None
+    except (OSError, ValueError) as e:
+        raise NoCopy(f"{path} does not read ({e}); fetch it again with: "
+                     f"cronward watch {host}") from None
+    st["viewer"] = {"host": host, "fetched": fetched,
+                    "error": clean(v["error"]) if v.get("error") else None,
+                    "offline": bool(v.get("offline")),
+                    "unreachable_since": v.get("unreachable_since"),
+                    "stopped_ticking": stopped(st, fetched)}
+    return st
 
 
 def _load_viewer(host: str) -> dict | None:
@@ -187,9 +231,13 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
     try:
         st = fetch(host)
     except Offline as e:
+        v.update(offline=True, error=str(e))
+        state.write_json(_viewer_path(host), v)
         print(f"{e}; trying again later", file=sys.stderr)
         return 0
     except Unreachable as e:
+        v.pop("offline", None)
+        v["error"] = str(e)
         since = v.get("unreachable_since") or now
         v["unreachable_since"] = since
         if now - since >= UNREACHABLE_FOR and not v.get("unreachable_said"):
@@ -201,6 +249,10 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
         print(e, file=sys.stderr)
         return 1
 
+    state.write_json(copy_path(host), st)
+    v["fetched"] = now
+    v.pop("offline", None)
+    v.pop("error", None)
     if v.pop("unreachable_said", False):
         notices.append({"title": f"cronward: {host} is reachable again", "body": "",
                         "kind": "host"})
@@ -211,7 +263,7 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
     v["contacted"] = True
 
     tick = st.get("last_tick")
-    stale = not isinstance(tick, (int, float)) or now - tick > status.STALE
+    stale = stopped(st, now)
     if stale and not v.get("stale_said"):
         v["stale_said"] = True
         notices.append({"title": f"cronward on {host} has stopped ticking",
