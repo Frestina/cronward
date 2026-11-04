@@ -242,10 +242,12 @@ def cmd_edit() -> int:
     path = config.config_path()
     if not path.exists():
         raise ConfigError(f"no config at {path}; write one with: cronward init")
+    found = ("nano", "nvim", "vim", "vi")
     editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR")
-              or next((e for e in ("nano", "vi") if shutil.which(e)), None))
+              or next((e for e in found if shutil.which(e)), None))
     if not editor:
-        raise ConfigError(f"no editor: set $EDITOR, or edit {path} yourself")
+        raise ConfigError(f"no editor: set $EDITOR (none of {', '.join(found)} is on the "
+                          f"PATH), or edit {path} yourself")
     with config.editing():
         try:
             subprocess.run([*shlex.split(editor), str(path)])
