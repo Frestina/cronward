@@ -273,9 +273,11 @@ there, and says so when neither is there. The exit code is passed through;
 ssh's own failure (255) is 2. Output is passed through as it comes: the far
 side is cronward, which cleans what it prints.
 
-`cronward edit` opens the config in `$VISUAL`, `$EDITOR`, nano or vi, holding
-the config lock while it is open (an `add` meanwhile waits and says so),
-then checks that the config reads.
+`cronward edit` opens the config in `$VISUAL`, `$EDITOR`, or the first of
+nano, nvim, vim and vi that it finds, holding the config lock while it is
+open (an `add` meanwhile waits and says so), then checks that the config
+reads. Over `--on HOST` the desktop's `$EDITOR` is not set, so the fallback
+is what an editor button on a viewer gets.
 
 `cronward workflows [<account>] --json` is what a picker needs:
 `{"accounts": [{"account", "error", "repos": [{"repo", "error",

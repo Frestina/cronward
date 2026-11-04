@@ -261,6 +261,25 @@ class CliTest(CronwardTest):
         self.assertEqual(rc, 2)
         self.assertIn("the config does not read now", err)
 
+    def test_edit_finds_an_editor_without_editor_set(self):
+        # Over ssh, $EDITOR from the desktop session is not set, and an
+        # Omarchy machine has nvim but no nano or vi.
+        self.config()
+        bin_dir = self.root / "editors"
+        bin_dir.mkdir()
+        env = {"EDITOR": "", "VISUAL": "", "PATH": str(bin_dir)}
+        with mock.patch.dict(os.environ, env):
+            rc, _, err = self.run_cli("edit")
+        self.assertEqual(rc, 2)
+        self.assertIn("no editor: set $EDITOR (none of nano, nvim, vim, vi", err)
+        nvim = bin_dir / "nvim"
+        nvim.write_text('#!/bin/sh\necho "# edited in nvim" >> "$1"\n')
+        nvim.chmod(0o755)
+        with mock.patch.dict(os.environ, env):
+            rc, out, err = self.run_cli("edit")
+        self.assertEqual(rc, 0, err)
+        self.assertIn("# edited in nvim", config.config_path().read_text())
+
     def test_edit_needs_a_config(self):
         rc, _, err = self.run_cli("edit")
         self.assertEqual(rc, 2)
