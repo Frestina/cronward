@@ -40,8 +40,9 @@ Jobs live on the main machine, which holds the config and the tokens. Run
    Run each command there by putting `--on <host>` first:
    `cronward --on <host> status`. It runs cronward over the user's ssh and
    passes the exit code through; 2 with "ssh failed" means ssh could not
-   log in (no key, a passphrase). Then ask the user to run the commands, or
-   to make ssh to `<host>` work for you.
+   log in (no key, a passphrase), and "this key only reads the status"
+   means ssh logged in with the viewer's read-only key. Then ask the user
+   to run the commands, or to make ssh to `<host>` work for you.
 3. Otherwise cronward is not set up for this user. Tell them, point them to
    the install steps in cronward's README, and stop.
 

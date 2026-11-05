@@ -225,7 +225,10 @@ author sits at, hourly at :08: soon enough for jobs that run daily, and few
 logins on the main machine. It runs `cronward watch <host>`: one ssh call
 (batch mode, no agent, no forwarding) that reads the main machine's
 status.json with `cat`, so cronward need not be on the main machine's PATH
-for ssh. It needs no config and no token.
+for ssh. It needs no config and no token. The command it sends starts with
+`cat -- ` and keeps doing so: a viewer key limited in `authorized_keys` to
+reading the status (README) matches on it, and refuses the rest with exit
+1, so `--on` through such a key fails rather than looks done.
 
 The viewer keeps its own record of what it has said, and says:
 
