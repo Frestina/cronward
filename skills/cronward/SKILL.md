@@ -61,9 +61,11 @@ Jobs live on the main machine, which holds the config and the tokens. Run
    - One job has one cron line. For a workflow with several, add one job
      per line.
 2. **Make the workflow startable.** Its `on:` needs `workflow_dispatch:`.
-   Add it beside the other triggers, turning a short form such as
-   `on: push` or `on: [push]` into a mapping. Leave `schedule:` in place for
-   now.
+   If `on:` already has `workflow_dispatch:` and no `schedule:`, the repo
+   needs no change: skip this step and step 5, and say in step 6 that
+   nothing was committed. Otherwise add it beside the other triggers,
+   turning a short form such as `on: push` or `on: [push]` into a mapping.
+   Leave `schedule:` in place for now.
    - If `workflow_dispatch` has required inputs without a default, plan to
      give each with `--input KEY=VALUE`.
    - The change must be on the default branch (or the branch given with
@@ -107,9 +109,11 @@ Jobs live on the main machine, which holds the config and the tokens. Run
 5. **Take out `schedule:`** once a run has passed, or GitHub's own
    scheduled runs come on top of cronward's on the days they do fire. Keep
    `workflow_dispatch:`. Commit it the same way as step 2.
-6. **Tell the user** the job's name, its schedule and zone, the next slot,
-   and the test run's URL. They get a notice when a job's result changes to
-   failed or didn't run, and when it passes again.
+6. **Tell the user** the job's name, its schedule and zone, the next slot
+   in their own local time, and the test run's URL. The next slot `add`
+   prints is in the main machine's local time, not UTC or the job's zone;
+   `next` in `status --json` is a Unix time. They get a notice when a job's
+   result changes to failed or didn't run, and when it passes again.
 
 ## Other tasks
 
