@@ -36,6 +36,23 @@ The runs still happen on GitHub's machines. cronward is not a runner and
 never runs code from a repo. It talks only to `api.github.com`, with a
 fine-grained token per account, limited to Actions in the repos you pick.
 
+## Why not GitHub's `schedule:`
+
+GitHub's own docs for the
+[`schedule` event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+say it "can be delayed during periods of high loads of GitHub Actions
+workflow runs", that high load times include the start of every hour, and:
+"If the load is sufficiently high enough, some queued jobs may be
+dropped." Nothing tells you a run was dropped: the Actions tab only shows
+the runs that happened.
+
+Some schedules never fire at all, while "Run workflow" by hand works every
+time. The community forum has reports of it, such as
+[#203880](https://github.com/orgs/community/discussions/203880) and
+[#210326](https://github.com/orgs/community/discussions/210326), with no
+answer from GitHub. `workflow_dispatch`, which cronward uses, is the
+trigger that keeps working in those reports.
+
 ## Why not a crontab line with curl
 
 You can: `curl -X POST .../dispatches` from cron, or a hosted cron service
@@ -91,7 +108,8 @@ Fine-grained tokens, Generate new token**.
 
 - **Resource owner**: the user or organisation that owns the repos. Each
   owner needs its own token, stored under its own account name.
-- **Repository access**: only select repositories, the ones with jobs.
+- **Repository access**: only select repositories, the ones with jobs,
+  private or public.
 - **Permissions**: Repository permissions, **Actions: Read and write**.
   Nothing else; GitHub adds Metadata: read itself.
 
@@ -181,6 +199,14 @@ rule no longer applies to it. If it does happen, while the lines are still
 there, cronward turns the workflow back on and tells you (`reenable =
 false` to only be told). A workflow you turned off yourself is never turned
 on.
+
+### Private repos
+
+They work the same as public ones, on schedule and with `cronward run`: the
+token needs the same Actions: read and write on them, and nothing more. A
+run cronward starts in a private repo spends the account's Actions minutes
+the same as a run GitHub's own `schedule:` starts there. cronward moves the
+start, not the run.
 
 ## With an agent
 
