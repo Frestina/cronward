@@ -95,6 +95,7 @@ command = ""            # optional: run with each notice as JSON on stdin
 
 - **Accounts.** A fine-grained token belongs to one resource owner (a user
   or an organisation), so each owner whose repos have jobs needs an account.
+  `token set` adds a new one, so adding an owner is one step.
 - **Schedule.** The cron syntax GitHub uses: numbers, `*`, `,`, `-` and `/`,
   plus month and day names. Day 0 and 7 are Sunday. When both day of month
   and day of week are set, either one matching is enough, as in cron.
@@ -124,6 +125,14 @@ token is a plain file, and says when the machine can now encrypt it.
 `token set` refuses text with characters no GitHub token has, without
 showing it. A token is never refused for being plain: on those
 systems cronward would not work at all.
+
+Once the token is stored, `token set` adds `[accounts.<account>]` to the
+config if it lacks it, after the last account, in the same way and under
+the same lock as `add`, and says so. A token GitHub refuses changes
+neither the config nor the stored tokens. With no config it writes none
+and points to `cronward init`; when the config does not read, the token
+stays stored and `token set` exits 2, saying the account is not in the
+config.
 
 GitHub sends a token's expiry date with every answer. cronward keeps it and
 warns once a day from 14 days before. A refused token makes the job's slot

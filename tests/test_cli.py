@@ -90,6 +90,44 @@ class CliTest(CronwardTest):
         self.assertIn("nothing stored", err)
         self.assertIsNone(tokens.kind("personal"))
 
+    def test_token_set_adds_a_new_account_to_the_config(self):
+        self.config()
+        rc, out, err = self.run_cli("token", "set", "work", stdin="github_pat_work\n")
+        self.assertEqual(rc, 0, err)
+        self.assertIn("note: the config has no [accounts.work] yet", out)
+        self.assertIn("added [accounts.work] to", out)
+        self.assertEqual(config.load().accounts, ("personal", "work"))
+        self.assertEqual(tokens.load("work"), "github_pat_work")
+        rc, out, _ = self.run_cli("token", "set", "work", stdin="github_pat_work2\n")
+        self.assertEqual(rc, 0)
+        self.assertNotIn("[accounts.work]", out)
+        self.assertEqual(config.load().accounts, ("personal", "work"))
+
+    def test_a_refused_token_adds_no_account(self):
+        self.config()
+        before = config.config_path().read_text()
+        self.gh.token_ok = False
+        rc, _, err = self.run_cli("token", "set", "work", stdin="github_pat_bad\n")
+        self.assertEqual(rc, 2)
+        self.assertEqual(config.config_path().read_text(), before)
+        self.assertIsNone(tokens.kind("work"))
+
+    def test_token_set_without_a_config_writes_none(self):
+        rc, out, _ = self.run_cli("token", "set", "work", stdin="github_pat_work\n")
+        self.assertEqual(rc, 0)
+        self.assertIn("no config at", out)
+        self.assertFalse(config.config_path().exists())
+        self.assertEqual(tokens.load("work"), "github_pat_work")
+
+    def test_token_set_with_a_config_that_does_not_read_keeps_the_token(self):
+        config.config_path().parent.mkdir(parents=True)
+        config.config_path().write_text("[accounts.personal\n")
+        rc, _, err = self.run_cli("token", "set", "work", stdin="github_pat_work\n")
+        self.assertEqual(rc, 2)
+        self.assertIn("the token is stored, but [accounts.work] is not in the config", err)
+        self.assertEqual(config.config_path().read_text(), "[accounts.personal\n")
+        self.assertEqual(tokens.load("work"), "github_pat_work")
+
     def test_a_classic_token_gets_a_note(self):
         _, out, _ = self.run_cli("token", "set", "personal", stdin="ghp_classic\n")
         self.assertIn("not a fine-grained token", out)

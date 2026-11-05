@@ -90,7 +90,7 @@ On GitHub: **Settings, Developer settings, Personal access tokens,
 Fine-grained tokens, Generate new token**.
 
 - **Resource owner**: the user or organisation that owns the repos. Each
-  owner needs its own token, and its own `[accounts.<name>]` in the config.
+  owner needs its own token, stored under its own account name.
 - **Repository access**: only select repositories, the ones with jobs.
 - **Permissions**: Repository permissions, **Actions: Read and write**.
   Nothing else; GitHub adds Metadata: read itself.
@@ -103,6 +103,11 @@ goes in the config.
 ```sh
 cronward token set personal
 ```
+
+It prints the GitHub user the token belongs to, so you can see it was made
+under the right owner. For a name the config lacks, such as `work` for a
+second owner, it adds `[accounts.work]` to the config once the token is
+stored.
 
 ### 2. Jobs
 

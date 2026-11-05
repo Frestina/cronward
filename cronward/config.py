@@ -5,9 +5,10 @@ SPEC.md and in TEMPLATE, which `cronward init` writes. Unknown keys are
 errors, so a typo is caught instead of quietly ignored. A config with no
 jobs is fine: a viewer needs none.
 
-`cronward add` and `remove` change the file's text, not a parsed copy, so
-comments stay. Every change is read back before it is saved, and made under
-editing(), so two of them at once never lose one's change.
+`cronward add`, `remove` and `token set` change the file's text, not a
+parsed copy, so comments stay. Every change is read back before it is
+saved, and made under editing(), so two of them at once never lose one's
+change.
 """
 
 import contextlib
@@ -319,6 +320,36 @@ def with_job(text: str, name: str, settings: dict[str, object]) -> str:
     new = (text.rstrip("\n") + "\n\n" if text.strip() else "") + block + "\n"
     if name not in {j.name for j in parse(new).jobs}:
         raise ConfigError(f"[jobs.{name}] does not read back from the config; add it by hand")
+    return new
+
+
+def with_account(text: str, name: str) -> str:
+    """The config text with [accounts.<name>] added after the last account,
+    or at the end when there is none. Refused unless the rest of the config
+    reads exactly as before."""
+    if not NAME.fullmatch(name):
+        raise ConfigError(f"{name!r} is not an account name: letters, digits, '.', '_' and '-'")
+    before = parse(text)
+    if name in before.accounts:
+        return text
+    lines = text.splitlines(keepends=True)
+    header = re.compile(r'\s*\[\s*accounts\s*\.\s*(?:[A-Za-z0-9_.-]+|"[^"]*")\s*\]\s*(?:#.*)?$')
+    last = max((i for i, line in enumerate(lines) if header.match(line)), default=None)
+    if last is None:
+        new = (text.rstrip("\n") + "\n\n" if text.strip() else "") + f"[accounts.{name}]\n"
+    else:
+        head = lines[:last + 1]
+        if not head[-1].endswith("\n"):
+            head[-1] += "\n"
+        new = "".join(head + [f"[accounts.{name}]\n"] + lines[last + 1:])
+    want = dataclasses.replace(before, accounts=(*before.accounts, name))
+    try:
+        same = _comparable(parse(new)) == _comparable(want)
+    except ConfigError:
+        same = False
+    if not same:
+        raise ConfigError(f"[accounts.{name}] does not read back from the config; add it by "
+                          "hand: cronward edit")
     return new
 
 
