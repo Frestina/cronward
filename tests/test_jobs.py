@@ -83,6 +83,35 @@ class ConfigTextTest(CronwardTest):
             config.with_account(inline, "club")
         self.assertIn("by hand", str(refused.exception))
 
+    def test_adding_then_removing_an_account_gives_back_the_same_text(self):
+        for text in (CONFIG, config.TEMPLATE, 'timezone = "UTC"\n\n[notify]\ndesktop = false\n',
+                     "[accounts.personal]\n", ""):
+            with self.subTest(text=text):
+                self.assertEqual(config.without_account(config.with_account(text, "club"),
+                                                        "club"), text)
+
+    def test_removing_an_account_keeps_tables_apart(self):
+        text = 'timezone = "UTC"\n\n[accounts.club]  # the club\n[accounts.work]\n'
+        self.assertEqual(config.without_account(text, "club"),
+                         'timezone = "UTC"\n\n[accounts.work]\n')
+        text = 'timezone = "UTC"\n\n[accounts."club"]\n\n# phone\n[notify]\n'
+        self.assertEqual(config.without_account(text, "club"),
+                         'timezone = "UTC"\n\n# phone\n[notify]\n')
+        new = config.without_account(config.TEMPLATE, "personal")
+        self.assertEqual(config.parse(new).accounts, ())
+        self.assertIn("with: cronward token set <account>\n\n# One job per workflow", new)
+
+    def test_an_account_a_job_uses_is_not_removed(self):
+        with self.assertRaises(ConfigError) as refused:
+            config.without_account(CONFIG, "personal")
+        self.assertIn("used by check", str(refused.exception))
+
+    def test_an_account_that_cannot_be_found_as_a_table_is_not_removed(self):
+        for text in ('accounts = { club = {} }\n', '[accounts]\nclub = {}\n'):
+            with self.subTest(text=text), self.assertRaises(ConfigError) as refused:
+                config.without_account(text, "club")
+            self.assertIn("by hand", str(refused.exception))
+
 
 class AddRemoveTest(CronwardTest):
     def run_cli(self, *argv):

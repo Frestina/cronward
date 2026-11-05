@@ -95,7 +95,8 @@ command = ""            # optional: run with each notice as JSON on stdin
 
 - **Accounts.** A fine-grained token belongs to one resource owner (a user
   or an organisation), so each owner whose repos have jobs needs an account.
-  `token set` adds a new one, so adding an owner is one step.
+  `token set` adds a new one and `token remove` takes it out again, so
+  adding or removing an owner is one step.
 - **Schedule.** The cron syntax GitHub uses: numbers, `*`, `,`, `-` and `/`,
   plus month and day names. Day 0 and 7 are Sunday. When both day of month
   and day of week are set, either one matching is enough, as in cron.
@@ -133,6 +134,16 @@ neither the config nor the stored tokens. With no config it writes none
 and points to `cronward init`; when the config does not read, the token
 stays stored and `token set` exits 2, saying the account is not in the
 config.
+
+`cronward token remove <account>` deletes the token and its expiry, then
+takes `[accounts.<account>]` out of the config, in the same way and under
+the same lock, and says so. A `token set` of a new account followed by a
+`token remove` leaves the config as it was, byte for byte. When a job uses
+the account, it keeps the account and names those jobs, which do not run
+without a token. It does not take out an account whose table holds
+settings or that it cannot find as one `[accounts.<account>]` line; then,
+or when the config does not read, the token is still deleted and it exits
+2, saying why the account is not taken out.
 
 GitHub sends a token's expiry date with every answer. cronward keeps it and
 warns once a day from 14 days before. A refused token makes the job's slot
@@ -310,7 +321,7 @@ in the config. It exits 2 when an account's repos could not be listed.
 | `cronward init` | Write the example config |
 | `cronward edit` | Open the config in the user's editor, then check that it reads |
 | `cronward token set <account>` | Check and store a token, read from stdin |
-| `cronward token remove <account>` | Delete a stored token |
+| `cronward token remove <account>` | Delete a stored token, and the account from the config unless a job uses it |
 | `cronward workflows [<account>] [--json]` | The repos and workflows the token can reach (`GET /user/repos`, which lists exactly the repos a fine-grained token was given), and which are jobs; with no account, every account's |
 | `cronward add <job> --repo R --workflow W --schedule C` | Check a job with GitHub, then add it to the config |
 | `cronward remove <job>` | Take a job out of the config |
