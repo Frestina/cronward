@@ -1,10 +1,13 @@
 import json
+import os
+import subprocess
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 from unittest import mock
 
-from cronward import cli, config, notify, state, status
+from cronward import cli, config, notify, remote, state, status
 from tests.harness import REPO, CronwardTest, at
 
 NOW = at("2026-11-03 07:08")
@@ -194,3 +197,31 @@ class StatusHostTest(ViewerTest):
         out = self.status()[1]
         self.assertIn("bad[31m news", out)
         self.assertNotIn("\x1b", out)
+
+
+class ReadOnlyKeyTest(CronwardTest):
+    """The README's authorized_keys line for a viewer key that only reads the status."""
+
+    def forced(self, original):
+        readme = (Path(__file__).parents[1] / "README.md").read_text()
+        line = next(l for l in readme.splitlines() if l.startswith('restrict,command="'))
+        command = line[len('restrict,command="'):line.rindex('" ssh-ed25519 ')]
+        path = self.home / ".local/state/cronward/status.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"host": "anvil"}')
+        # As sshd runs it: in the home folder, through the login shell.
+        return subprocess.run(["sh", "-c", command], cwd=self.home, capture_output=True,
+                              text=True, env={"PATH": os.environ["PATH"],
+                                              "SSH_ORIGINAL_COMMAND": original})
+
+    def test_the_viewer_reads_the_status(self):
+        r = self.forced(notify.REMOTE)
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, '{"host": "anvil"}', ""))
+
+    def test_anything_else_is_refused(self):
+        on = remote.command("anvil", ["run", "check"], cli.commands(), tty=False)[-1]
+        for original in (on, "sh", ""):
+            r = self.forced(original)
+            self.assertEqual(r.returncode, 1, original)
+            self.assertEqual(r.stdout, "")
+            self.assertIn("this key only reads the status", r.stderr)

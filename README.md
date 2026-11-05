@@ -247,6 +247,46 @@ with your keys and agent, so it needs a login on the server that can run
 commands, not only the viewer's read of the status. It runs only cronward
 there.
 
+### A viewer key that only reads the status
+
+The viewer's timer needs a key without a passphrase. To keep that key from
+doing anything else on the server, make one for the viewer alone, and limit
+it on the server to reading the status.
+
+On the laptop:
+
+```sh
+ssh-keygen -t ed25519 -N '' -C 'cronward viewer' -f ~/.ssh/cronward_viewer
+```
+
+On the server, add `~/.ssh/cronward_viewer.pub` to `~/.ssh/authorized_keys`
+with this in front of it, all on one line:
+
+```
+restrict,command="case $SSH_ORIGINAL_COMMAND in 'cat -- '*) exec cat .local/state/cronward/status.json ;; *) echo 'cronward: this key only reads the status' >&2; exit 1 ;; esac" ssh-ed25519 AAAA... cronward viewer
+```
+
+`restrict` turns off forwarding and a terminal. Whatever the laptop asks
+for, this key gets status.json and nothing else, and anything but the
+viewer's read is refused with exit 1, so `cronward --on` through this key
+fails rather than looks done. If `XDG_STATE_HOME` is set on the server, put
+its path in place of `.local/state`.
+
+On the laptop, in `~/.ssh/config`:
+
+```
+Host homeserver
+  HostName homeserver.example.org
+  IdentityFile ~/.ssh/cronward_viewer
+```
+
+The viewer's timer uses key files only, so it logs in with this key. Your
+own ssh and `cronward --on` try your agent's keys first, so they still log
+in as you when your agent holds a key the server accepts; without one, they
+get this key and are refused. Leave out `IdentitiesOnly yes`, which keeps
+the agent's keys out. The limit is only worth having if this is the one key
+without a passphrase that the server takes from the laptop.
+
 ## Commands
 
 ```
