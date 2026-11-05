@@ -241,6 +241,12 @@ The viewer keeps its own record of what it has said, and says:
 The minute keeps clear of the hour and the quarter hours, where other
 timers crowd, so they don't ssh into the same machine at once.
 
+The main machine is another machine, so the viewer checks what it fetched
+before it keeps it: the schema, and each field it reads, with its type. A
+status that fails is told as not reading, like an unreachable machine, and
+the last good copy stays. `status --host` checks the copy again when it
+reads it, and says so, with exit 2, when it does not read.
+
 The viewer keeps what it fetched as `status-<host>.json` in its state
 folder (written atomically, the same schema), and records in its own file
 when it last fetched, and the last error and since when.

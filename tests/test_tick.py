@@ -1,6 +1,6 @@
 import json
 
-from cronward import state, tick
+from cronward import state, status, tick
 from tests.harness import JOB, REPO, CronwardTest, at
 
 
@@ -344,6 +344,17 @@ class NoticeTest(CronwardTest):
         st = json.loads(state.status_path().read_text())
         self.assertEqual(st["last_tick"], at("2026-11-03 05:56"))
         self.assertEqual(st["jobs"][0]["name"], "check")
+
+    def test_what_a_tick_writes_passes_a_viewers_check(self):
+        cfg = self.config()
+        self.tick(cfg, "2026-11-03 05:56")  # the first tick only takes note
+        self.tick(cfg, "2026-11-03 06:01")  # started: running
+        status.check(json.loads(state.status_path().read_text()))
+        self.gh.finish(1001, "success")
+        self.tick(cfg, "2026-11-03 06:06")  # passed, and the account's expiry
+        st = json.loads(state.status_path().read_text())
+        self.assertEqual(st["jobs"][0]["latest"]["kind"], "passed")
+        status.check(st)
 
 
 class _NoCall:
