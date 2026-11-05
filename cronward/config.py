@@ -5,8 +5,8 @@ SPEC.md and in TEMPLATE, which `cronward init` writes. Unknown keys are
 errors, so a typo is caught instead of quietly ignored. A config with no
 jobs is fine: a viewer needs none.
 
-`cronward add`, `remove` and `token set` change the file's text, not a
-parsed copy, so comments stay. Every change is read back before it is
+`cronward add`, `remove`, `token set` and `token remove` change the file's
+text, not a parsed copy, so comments stay. Every change is read back before it is
 saved, and made under editing(), so two of them at once never lose one's
 change.
 """
@@ -350,6 +350,49 @@ def with_account(text: str, name: str) -> str:
     if not same:
         raise ConfigError(f"[accounts.{name}] does not read back from the config; add it by "
                           "hand: cronward edit")
+    return new
+
+
+def without_account(text: str, name: str) -> str:
+    """The config text with [accounts.<name>] taken out, so that it undoes
+    with_account. Comments right above the next table stay with it. Blank
+    lines before the account go only when a blank line or the end follows,
+    so tables stay apart as before. Refused when the table holds settings,
+    a job uses the account, or the rest of the config would read otherwise."""
+    lines = text.splitlines(keepends=True)
+    quoted = re.escape(name)
+    header = re.compile(rf'\s*\[\s*accounts\s*\.\s*(?:{quoted}|"{quoted}")\s*\]\s*(?:#.*)?$')
+    starts = [i for i, line in enumerate(lines) if header.match(line)]
+    if len(starts) != 1:
+        raise ConfigError(f"cannot find one [accounts.{name}] in the config; take it out by "
+                          "hand: cronward edit")
+    start = starts[0]
+    end = start + 1
+    while end < len(lines) and not lines[end].lstrip().startswith("["):
+        end += 1
+    while end > start + 1 and (not lines[end - 1].strip()
+                               or lines[end - 1].lstrip().startswith("#")):
+        end -= 1
+    if any(line.strip() and not line.lstrip().startswith("#")
+           for line in lines[start + 1:end]):
+        raise ConfigError(f"[accounts.{name}] holds settings; take it out by hand: "
+                          "cronward edit")
+    if end == len(lines) or not lines[end].strip():
+        while start > 0 and not lines[start - 1].strip():
+            start -= 1
+    new = "".join(lines[:start] + lines[end:])
+    before = parse(text)
+    users = [j.name for j in before.jobs if j.account == name]
+    if users:
+        raise ConfigError(f"[accounts.{name}] is used by {', '.join(users)}")
+    want = dataclasses.replace(before, accounts=tuple(a for a in before.accounts if a != name))
+    try:
+        same = _comparable(parse(new)) == _comparable(want)
+    except ConfigError:
+        same = False
+    if not same:
+        raise ConfigError(f"taking out [accounts.{name}] would change more of the config; "
+                          "take it out by hand: cronward edit")
     return new
 
 

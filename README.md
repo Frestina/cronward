@@ -125,7 +125,9 @@ cronward token set personal
 It prints the GitHub user the token belongs to, so you can see it was made
 under the right owner. For a name the config lacks, such as `work` for a
 second owner, it adds `[accounts.work]` to the config once the token is
-stored.
+stored. `cronward token remove work` deletes the token and takes
+`[accounts.work]` back out, unless a job still uses it; then it keeps the
+account and names the jobs, which do not run without a token.
 
 ### 2. Jobs
 
@@ -323,7 +325,8 @@ without a passphrase that the server takes from the laptop.
 ```
 cronward init                        write the example config
 cronward edit                        open the config in your editor, then check it
-cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it
+cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it;
+                                     adds or takes out [accounts.ACCOUNT]
 cronward workflows [ACCOUNT] [--json]
                                      the repos and workflows the tokens can reach
 cronward add JOB --repo R --workflow W --schedule CRON

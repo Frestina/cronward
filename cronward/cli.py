@@ -2,7 +2,8 @@
 
     cronward init                        write the example config
     cronward edit                        open the config in your editor, then check it
-    cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it
+    cronward token set|remove ACCOUNT    store a token (read from stdin), or delete it;
+                                         adds or takes out [accounts.ACCOUNT]
     cronward workflows [ACCOUNT] [--json]
                                          the repos and workflows the tokens can reach
     cronward add JOB --repo R --workflow W --schedule CRON
@@ -127,6 +128,20 @@ def cmd_token(action: str, account: str) -> int:
     if action == "remove":
         print(f"removed the token for {account}" if tokens.remove(account)
               else f"no token stored for {account}")
+        if state.path().exists():
+            # Its expiry would otherwise warn about a token that is gone.
+            with state.locked(wait=True):
+                data = state.load()
+                if data["accounts"].pop(account, None) is not None:
+                    state.save(data)
+        try:
+            said = _remove_account(account)
+        except ConfigError as e:
+            print(f"cronward: the token is removed, but [accounts.{account}] is not taken out of "
+                  f"the config: {e}", file=sys.stderr)
+            return EXIT_ERROR
+        if said:
+            print(said)
         return EXIT_OK
     try:
         cfg = config.load(required=False) if config.config_path().exists() else None
@@ -198,6 +213,31 @@ def _add_account(account: str) -> str | None:
             return None
         config.save(new)
     return f"added [accounts.{account}] to {path}"
+
+
+def _remove_account(account: str) -> str | None:
+    """Takes [accounts.<account>] out of the config unless a job uses it;
+    says what it did."""
+    path = config.config_path()
+    with config.editing():
+        try:
+            text = path.read_text()
+        except FileNotFoundError:
+            return None
+        cfg = config.parse(text, str(path))
+        if account not in cfg.accounts:
+            return None
+        users = [j.name for j in cfg.jobs if j.account == account]
+        if users:
+            jobs = (f"job {users[0]} uses it" if len(users) == 1
+                    else f"jobs {', '.join(users)} use it")
+            return (f"note: kept [accounts.{account}] in {path}, as {jobs}. Without a token "
+                    f"{'it does' if len(users) == 1 else 'they do'} not run: store one with "
+                    f"`cronward token set {account}`, or take "
+                    + (f"it out with `cronward remove {users[0]}`" if len(users) == 1
+                       else "each out with `cronward remove JOB`"))
+        config.save(config.without_account(text, account))
+    return f"removed [accounts.{account}] from {path}"
 
 
 def _workflows(account: str, jobs: tuple[config.Job, ...]) -> dict:

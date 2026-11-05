@@ -128,6 +128,52 @@ class CliTest(CronwardTest):
         self.assertEqual(config.config_path().read_text(), "[accounts.personal\n")
         self.assertEqual(tokens.load("work"), "github_pat_work")
 
+    def test_token_remove_undoes_token_set(self):
+        self.config()
+        state.path().parent.mkdir(parents=True, exist_ok=True)
+        state.write_json(state.path(), state.empty())
+        before = config.config_path().read_bytes()
+        self.run_cli("token", "set", "work", stdin="github_pat_work\n")
+        self.assertIn("work", state.load()["accounts"])
+        rc, out, err = self.run_cli("token", "remove", "work")
+        self.assertEqual(rc, 0, err)
+        self.assertIn("removed the token for work", out)
+        self.assertIn("removed [accounts.work] from", out)
+        self.assertEqual(config.config_path().read_bytes(), before)
+        self.assertIsNone(tokens.kind("work"))
+        self.assertNotIn("work", state.load()["accounts"])
+        rc, out, _ = self.run_cli("token", "remove", "work")
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "no token stored for work\n")
+
+    def test_token_remove_keeps_an_account_a_job_uses_and_names_the_job(self):
+        self.config()
+        tokens.store("personal", "t0ken")
+        rc, out, err = self.run_cli("token", "remove", "personal")
+        self.assertEqual(rc, 0, err)
+        self.assertIn("removed the token for personal", out)
+        self.assertIn("kept [accounts.personal]", out)
+        self.assertIn("as job check uses it", out)
+        self.assertIn("`cronward remove check`", out)
+        self.assertEqual(config.load().accounts, ("personal",))
+        self.assertIsNone(tokens.kind("personal"))
+
+    def test_token_remove_without_a_config_only_removes_the_token(self):
+        tokens.store("work", "t0ken")
+        rc, out, _ = self.run_cli("token", "remove", "work")
+        self.assertEqual((rc, out), (0, "removed the token for work\n"))
+        self.assertFalse(config.config_path().exists())
+
+    def test_token_remove_with_a_config_that_does_not_read_still_removes_the_token(self):
+        config.config_path().parent.mkdir(parents=True)
+        config.config_path().write_text("[accounts.work\n")
+        tokens.store("work", "t0ken")
+        rc, _, err = self.run_cli("token", "remove", "work")
+        self.assertEqual(rc, 2)
+        self.assertIn("the token is removed, but [accounts.work] is not taken out of the config", err)
+        self.assertEqual(config.config_path().read_text(), "[accounts.work\n")
+        self.assertIsNone(tokens.kind("work"))
+
     def test_a_classic_token_gets_a_note(self):
         _, out, _ = self.run_cli("token", "set", "personal", stdin="ghp_classic\n")
         self.assertIn("not a fine-grained token", out)
