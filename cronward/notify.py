@@ -161,10 +161,9 @@ def fetch(host: str) -> dict:
         raise Unreachable(f"cannot read the status on {host}: {last}")
     try:
         data = json.loads(done.stdout)
-        if data.get("schema") != status.SCHEMA or not isinstance(data.get("jobs"), list):
-            raise ValueError("not a status this version reads")
-    except (ValueError, AttributeError) as e:
-        raise Unreachable(f"the status on {host} does not read: {e}") from None
+        status.check(data)
+    except ValueError as e:
+        raise Unreachable(f"the status on {host} does not read: {clean(e)}") from None
     return data
 
 
@@ -199,13 +198,14 @@ def copy(host: str) -> dict:
     v = _load_viewer(host) or {}
     try:
         st = json.loads(path.read_text())
+        status.check(st)
         fetched = v.get("fetched") or path.stat().st_mtime
     except FileNotFoundError:
         tried = f" (last try: {clean(v['error'])})" if v.get("error") else ""
         raise NoCopy(f"no status from {host} yet{tried}: it is fetched hourly at :08, or now "
                      f"with: cronward watch {host}") from None
     except (OSError, ValueError) as e:
-        raise NoCopy(f"{path} does not read ({e}); fetch it again with: "
+        raise NoCopy(f"{path} does not read ({clean(e)}); fetch it again with: "
                      f"cronward watch {host}") from None
     st["viewer"] = {"host": host, "fetched": fetched,
                     "error": clean(v["error"]) if v.get("error") else None,

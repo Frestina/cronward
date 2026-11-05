@@ -6,7 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from cronward import __version__, cli, config, state, tokens
+from cronward import __version__, cli, config, state, status, tokens
 from tests.harness import EXPIRES, JOB, REPO, CronwardTest
 
 
@@ -138,6 +138,7 @@ class CliTest(CronwardTest):
         self.assertIn("does not read", err)
         st = json.loads(state.status_path().read_text())
         self.assertIn("does not read", st["tick_error"])
+        status.check(st)
 
     def test_a_failing_tick_is_told_once_until_a_tick_works(self):
         self.config()

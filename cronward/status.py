@@ -7,7 +7,8 @@
 
 latest is the newest final result, running the newest pending one, and
 recent the last RECENT results, oldest first. A viewer's copy, shown by
-`status --host`, adds {"viewer": {...}} (notify.copy).
+`status --host`, adds {"viewer": {...}} (notify.copy). A viewer runs check
+on what it fetched before it keeps or shows it.
 """
 
 import datetime
@@ -62,6 +63,66 @@ def build(cfg: Config, data: dict, now: float | None = None) -> dict:
     return {"schema": SCHEMA, "host": socket.gethostname(), "now": now,
             "last_tick": data.get("last_tick"), "tick_error": data.get("tick_error"),
             "jobs": jobs, "accounts": accounts}
+
+
+# What a status from another machine must hold before a viewer uses it: the
+# fields build makes and the viewer reads. "?" allows null.
+_TOP = {"host": "str", "now": "time", "last_tick": "time?", "tick_error": "str?"}
+_JOB = {"name": "str", "account": "str", "repo": "str", "workflow": "str",
+        "schedule": "str", "timezone": "str", "enabled": "bool", "next": "time?"}
+_RESULT = {"job": "str", "slot": "time", "kind": "kind", "reason": "str",
+           "url": "str??", "finished": "time??", "note": "str??", "manual": "bool??"}
+_ACCOUNT = {"name": "str", "token": "str?", "expires": "str?", "expires_soon": "bool"}
+_LATEST = 1e11  # past this, a time is no date Python can show
+
+
+def _ok(value: object, kind: str) -> bool:
+    if value is None:
+        return kind.endswith("?")
+    kind = kind.rstrip("?")
+    if kind == "time":
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and 0 <= value < _LATEST)  # also refuses NaN
+    if kind == "kind":
+        return isinstance(value, str) and value in WORDS
+    return isinstance(value, {"str": str, "bool": bool}[kind])
+
+
+def _fields(obj: object, shape: dict[str, str], where: str) -> None:
+    if not isinstance(obj, dict):
+        raise ValueError(f"{where} is not an object")
+    for key, kind in shape.items():
+        # "??": may be left out; the viewer reads it with .get.
+        if key not in obj and not kind.endswith("??"):
+            raise ValueError(f"{where} has no {key}")
+        if not _ok(obj.get(key), kind):
+            raise ValueError(f"{where}.{key} is {obj[key]!r:.40}")
+
+
+def check(st: object) -> None:
+    """ValueError, saying what is wrong, unless st is a status as build makes
+    it. A viewer checks the main machine's before it keeps or shows it."""
+    if not isinstance(st, dict):
+        raise ValueError("it is not an object")
+    if st.get("schema") != SCHEMA:
+        raise ValueError(f"schema {st.get('schema')!r:.20}: not a status this version reads")
+    _fields(st, _TOP, "the status")
+    for key in ("jobs", "accounts"):
+        if not isinstance(st.get(key), list):
+            raise ValueError(f"the status has no {key} list")
+    for i, account in enumerate(st["accounts"]):
+        _fields(account, _ACCOUNT, f"accounts[{i}]")
+    for i, job in enumerate(st["jobs"]):
+        _fields(job, _JOB, f"jobs[{i}]")
+        for key in ("latest", "running"):
+            if key not in job:
+                raise ValueError(f"jobs[{i}] has no {key}")
+            if job[key] is not None:
+                _fields(job[key], _RESULT, f"jobs[{i}].{key}")
+        if not isinstance(job.get("recent"), list):
+            raise ValueError(f"jobs[{i}] has no recent list")
+        for n, rec in enumerate(job["recent"]):
+            _fields(rec, _RESULT, f"jobs[{i}].recent[{n}]")
 
 
 def write(cfg: Config, data: dict) -> None:

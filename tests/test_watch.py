@@ -225,3 +225,57 @@ class ReadOnlyKeyTest(CronwardTest):
             self.assertEqual(r.returncode, 1, original)
             self.assertEqual(r.stdout, "")
             self.assertIn("this key only reads the status", r.stderr)
+
+
+class BadStatusTest(ViewerTest):
+    """A status from the main machine that has the schema but not the fields
+    (#37): told as not reading, never kept, never a traceback."""
+
+    BAD = {
+        "no host": lambda st: st.pop("host"),
+        "last_tick a string": lambda st: st.update(last_tick="2026-11-03T07:00:00+01:00"),
+        "now not a number": lambda st: st.update(now=float("nan")),
+        "no accounts": lambda st: st.pop("accounts"),
+        "a job not an object": lambda st: st["jobs"].append("check"),
+        "latest a string": lambda st: st["jobs"][0].update(latest="passed"),
+        "a result of no kind": lambda st: st["jobs"][0]["recent"][0].update(kind="fine"),
+        "a kind that is a list": lambda st: st["jobs"][0]["recent"][0].update(kind=["passed"]),
+        "a slot past any date": lambda st: st["jobs"][0]["recent"][0].update(slot=1e300),
+        "enabled a string": lambda st: st["jobs"][0].update(enabled="yes"),
+    }
+
+    def bad_status(self, how):
+        self.main_status([rec("2026-11-03 06:00", "passed")])
+        path = self.root / "homes" / "anvil" / ".local/state/cronward/status.json"
+        st = json.loads(path.read_text())
+        self.BAD[how](st)
+        path.write_text(json.dumps(st))
+
+    def test_watch_says_it_does_not_read_and_keeps_the_good_copy(self):
+        self.main_status([rec("2026-11-03 06:00", "failed", "red")])
+        self.watch()
+        good = notify.copy_path("anvil").read_text()
+        for how in self.BAD:
+            with self.subTest(how):
+                self.bad_status(how)
+                err = StringIO()
+                with redirect_stderr(err):
+                    rc = notify.watch("anvil", config.Config(), now=NOW)
+                self.assertEqual(rc, 1)
+                self.assertIn("the status on anvil does not read: ", err.getvalue())
+                self.assertEqual(notify.copy_path("anvil").read_text(), good)
+
+    def test_status_host_on_a_bad_copy_says_so(self):
+        for how in self.BAD:
+            with self.subTest(how):
+                self.bad_status(how)
+                path = self.root / "homes" / "anvil" / ".local/state/cronward/status.json"
+                notify.copy_path("anvil").parent.mkdir(parents=True, exist_ok=True)
+                notify.copy_path("anvil").write_text(path.read_text())
+                out, err = StringIO(), StringIO()
+                with redirect_stdout(out), redirect_stderr(err):
+                    rc = cli.main(["status", "--host", "anvil", "--json"])
+                self.assertEqual((rc, out.getvalue()), (2, ""))
+                self.assertIn("does not read", err.getvalue())
+                self.assertIn("cronward watch anvil", err.getvalue())
+                self.assertNotIn("Traceback", err.getvalue())
