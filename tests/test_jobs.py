@@ -1,10 +1,11 @@
 import io
+import json
 import threading
 import types
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
-from cronward import cli, config, state, tokens
+from cronward import cli, config, state, status, tokens
 from cronward.config import ConfigError
 from tests.harness import REPO, CronwardTest
 
@@ -217,6 +218,29 @@ class AddRemoveTest(CronwardTest):
         rc, _, err = self.run_cli("remove", "check")
         self.assertEqual(rc, 2)
         self.assertIn("no job 'check'", err)
+
+    def test_status_json_follows_add_and_remove_so_a_viewer_sees_them_at_once(self):
+        self.config(CONFIG)
+        tokens.store("work", "t0ken")
+        status.write(config.load(), state.load())  # as the last tick left it
+
+        def jobs():
+            return [j["name"] for j in json.loads(state.status_path().read_text())["jobs"]]
+
+        self.assertEqual(jobs(), ["check"])
+        self.assertEqual(self.run_cli(*ADD)[0], 0)
+        self.assertEqual(jobs(), ["check", "nightly"])
+        self.assertEqual(self.run_cli("remove", "check")[0], 0)
+        self.assertEqual(jobs(), ["nightly"])
+        # A refused add changes nothing, and status.json stays as it was.
+        self.gh.repos.clear()
+        self.assertEqual(self.run_cli("add", "other", *ADD[2:])[0], 1)
+        self.assertEqual(jobs(), ["nightly"])
+
+    def test_without_a_tick_yet_there_is_still_no_status_json(self):
+        self.config(CONFIG)
+        self.assertEqual(self.run_cli("remove", "check")[0], 0)
+        self.assertFalse(state.status_path().exists())
 
     def test_a_config_kept_elsewhere_through_a_symlink_stays_a_symlink(self):
         real = self.root / "dotfiles" / "config.toml"

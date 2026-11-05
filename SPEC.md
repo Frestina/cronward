@@ -202,6 +202,12 @@ Then, for every pending result:
 7. **Status.** The tick writes `~/.local/state/cronward/status.json`, with
    its time, and notifies.
 
+`add`, `remove`, `edit` and `token` write status.json again when they are
+done, so a viewer that fetches at once sees the jobs and accounts as the
+config now has them, not as the last tick did. They wait for a tick that
+holds the lock, and write only a status.json that is there: a main machine
+that has never ticked keeps saying so.
+
 `cronward tick --dry-run` prints what is due and why, and changes nothing.
 `cronward run <job>` starts a job now, outside its schedule, recorded as a
 manual slot. It waits for a tick that holds the lock to finish, and says it

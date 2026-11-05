@@ -547,6 +547,20 @@ def commands() -> tuple[str, ...]:
     return tuple(sub.choices)
 
 
+def _then_status(args: argparse.Namespace) -> int:
+    """A command that changes the config or a token, then status.json to match."""
+    if args.cmd == "edit":
+        rc = cmd_edit()
+    elif args.cmd == "token":
+        rc = cmd_token(args.action, args.account)
+    elif args.cmd == "add":
+        rc = cmd_add(args)
+    else:
+        rc = cmd_remove(args.job)
+    status.refresh()
+    return rc
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     try:
@@ -563,20 +577,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "init":
             return cmd_init()
-        if args.cmd == "edit":
-            return cmd_edit()
-        if args.cmd == "token":
-            return cmd_token(args.action, args.account)
+        if args.cmd in ("edit", "token", "add", "remove"):
+            return _then_status(args)
         if args.cmd == "workflows":
             return cmd_workflows(args.account, args.json)
         if args.cmd == "doctor":
             return doctor.run()
         if args.cmd == "status":
             return cmd_status(args.json, args.host)
-        if args.cmd == "add":
-            return cmd_add(args)
-        if args.cmd == "remove":
-            return cmd_remove(args.job)
         if args.cmd == "run":
             return cmd_run(args.job, args.wait)
         if args.cmd == "tick":

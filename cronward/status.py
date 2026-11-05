@@ -15,8 +15,8 @@ import datetime
 import socket
 import time
 
-from cronward import cron, state, tokens
-from cronward.config import Config
+from cronward import config, cron, state, tokens
+from cronward.config import Config, ConfigError
 from cronward.state import PASSED, WORDS
 
 SCHEMA = 1
@@ -127,6 +127,22 @@ def check(st: object) -> None:
 
 def write(cfg: Config, data: dict) -> None:
     state.write_json(state.status_path(), build(cfg, data))
+
+
+def refresh() -> None:
+    """Writes status.json again once the config or a token changed (add,
+    remove, edit, token), so a viewer that fetches at once sees the change,
+    not the last tick's jobs. Only when there is one: a main machine that has
+    never ticked keeps saying so. A config or state that does not read is
+    left to the next tick, which says why."""
+    if not state.status_path().exists():
+        return
+    try:
+        cfg = config.load()
+        with state.locked(wait=True):
+            write(cfg, state.load())
+    except (ConfigError, state.StateError, OSError):
+        pass
 
 
 def age(seconds: float) -> str:
