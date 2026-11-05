@@ -129,11 +129,12 @@ def cmd_token(action: str, account: str) -> int:
               else f"no token stored for {account}")
         return EXIT_OK
     try:
-        cfg = config.load(required=False)
+        cfg = config.load(required=False) if config.config_path().exists() else None
     except ConfigError:
         cfg = None
     if cfg is not None and account not in cfg.accounts:
-        print(f"note: the config has no [accounts.{account}] yet")
+        print(f"note: the config has no [accounts.{account}] yet; it is added once GitHub "
+              "accepts the token")
     if sys.stdin.isatty():
         token = getpass.getpass(f"Fine-grained token for {account} (not shown): ")
     else:
@@ -172,7 +173,31 @@ def cmd_token(action: str, account: str) -> int:
     if token.startswith("ghp_") or token.startswith("gho_"):
         print("note: this is not a fine-grained token; one limited to Actions: read and write "
               "on the repos of your jobs is safer")
+    try:
+        added = _add_account(account)
+    except ConfigError as e:
+        print(f"cronward: the token is stored, but [accounts.{account}] is not in the config: "
+              f"{e}", file=sys.stderr)
+        return EXIT_ERROR
+    if added:
+        print(added)
     return EXIT_OK
+
+
+def _add_account(account: str) -> str | None:
+    """Adds [accounts.<account>] to the config if it lacks it; says what it did."""
+    path = config.config_path()
+    with config.editing():
+        try:
+            text = path.read_text()
+        except FileNotFoundError:
+            return (f"note: there is no config at {path}, so no [accounts.{account}] in it; "
+                    "write one with: cronward init")
+        new = config.with_account(text, account)
+        if new == text:
+            return None
+        config.save(new)
+    return f"added [accounts.{account}] to {path}"
 
 
 def _workflows(account: str, jobs: tuple[config.Job, ...]) -> dict:
@@ -217,8 +242,8 @@ def cmd_workflows(account: str | None, as_json: bool) -> int:
     cfg = config.load(required=account is None)
     names = (account,) if account else cfg.accounts
     if not names:
-        raise ConfigError(f"no accounts in {config.config_path()}: add [accounts.<name>], "
-                          "then store its token with: cronward token set <name>")
+        raise ConfigError(f"no accounts in {config.config_path()}: store a token with: "
+                          "cronward token set <name>, which adds [accounts.<name>]")
     found = [_workflows(name, cfg.jobs) for name in names]
     if as_json:
         json.dump({"accounts": found}, sys.stdout, indent=1, sort_keys=True)
@@ -362,11 +387,12 @@ def _add(a: argparse.Namespace) -> int:
         raise ConfigError(f"there is a job {a.job} already; take it out first with: "
                           f"cronward remove {a.job}")
     if not cfg.accounts:
-        raise ConfigError(f"no accounts in {path}: add [accounts.<name>], then store its token "
-                          "with: cronward token set <name>")
+        raise ConfigError(f"no accounts in {path}: store a token with: "
+                          "cronward token set <name>, which adds [accounts.<name>]")
     if a.account is not None and a.account not in cfg.accounts:
         raise ConfigError(f"no account {a.account!r} in {path}; there are: "
-                          f"{', '.join(cfg.accounts)}")
+                          f"{', '.join(cfg.accounts)}. A new one is added by storing its "
+                          f"token: cronward token set {a.account}")
     settings: dict[str, object] = {"repo": a.repo, "workflow": a.workflow,
                                    "schedule": a.schedule}
     for key, value in (("ref", a.ref), ("timezone", a.timezone),

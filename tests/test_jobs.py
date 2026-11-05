@@ -62,6 +62,27 @@ class ConfigTextTest(CronwardTest):
             config.without_job(split, "check")
         self.assertIn("by hand", str(refused.exception))
 
+    def test_an_account_goes_after_the_last_account(self):
+        new = config.with_account(CONFIG, "club")
+        self.assertIn("[accounts.work]\n[accounts.club]\n\n[jobs.check]", new)
+        self.assertEqual(config.parse(new).accounts, ("personal", "work", "club"))
+        self.assertIn("# my settings", new)
+
+    def test_an_account_goes_at_the_end_when_there_is_none(self):
+        text = 'timezone = "UTC"\n[notify]\ndesktop = false'
+        self.assertEqual(config.with_account(text, "club"),
+                         'timezone = "UTC"\n[notify]\ndesktop = false\n\n[accounts.club]\n')
+        self.assertEqual(config.with_account("", "club"), "[accounts.club]\n")
+
+    def test_an_account_already_there_changes_nothing(self):
+        self.assertEqual(config.with_account(CONFIG, "work"), CONFIG)
+
+    def test_an_account_that_does_not_read_back_is_refused(self):
+        inline = 'accounts = { personal = {} }\n'
+        with self.assertRaises(ConfigError) as refused:
+            config.with_account(inline, "club")
+        self.assertIn("by hand", str(refused.exception))
+
 
 class AddRemoveTest(CronwardTest):
     def run_cli(self, *argv):
