@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from cronward import __version__, cli, config, state, status, tokens
-from tests.harness import EXPIRES, JOB, REPO, CronwardTest
+from tests.harness import EXPIRES, JOB, REPO, CronwardTest, at
 
 
 class CliTest(CronwardTest):
@@ -375,3 +375,78 @@ class CliTest(CronwardTest):
         rc, out, _ = self.run_cli("tick", "--dry-run")
         self.assertIn("check: new", out)
         self.assertFalse(state.path().exists())
+
+    def results(self, *recs):
+        with state.locked():
+            data = state.load()
+            data["results"].extend(recs)
+            state.save(data)
+
+    def test_history_is_each_result_newest_first(self):
+        self.config()
+        url = "https://github.com/me/widget/actions/runs/"
+        self.results(
+            {**state.result("check", at("2026-11-01 06:00"), state.PASSED), "url": url + "1"},
+            {**state.result("check", at("2026-11-02 06:00"), state.FAILED,
+                            "the run ended failure"), "url": url + "2"},
+            state.result("check", at("2026-11-03 06:00"), state.DIDNT_RUN,
+                         "missed the slot at Nov 3 06:00"),
+            {**state.result("check", at("2026-11-03 09:30"), state.PASSED), "url": url + "4",
+             "manual": True},
+            {**state.result("check", at("2026-11-04 06:00")), "url": url + "5"},
+            state.result("other", at("2026-11-04 07:00"), state.FAILED, "not this job"))
+        rc, out, err = self.run_cli("history", "check")
+        self.assertEqual(rc, 0, err)
+        w = status.when
+        self.assertEqual(out.splitlines(), [
+            f"{w(at('2026-11-04 06:00')):<12}  running     {url}5",
+            f"{w(at('2026-11-03 09:30')):<12}  passed      started by hand  {url}4",
+            f"{w(at('2026-11-03 06:00')):<12}  didn't run  missed the slot at Nov 3 06:00",
+            f"{w(at('2026-11-02 06:00')):<12}  failed      the run ended failure  {url}2",
+            f"{w(at('2026-11-01 06:00')):<12}  passed      {url}1",
+        ])
+        rc, out, _ = self.run_cli("history", "check", "--json")
+        self.assertEqual(rc, 0)
+        got = json.loads(out)
+        self.assertEqual(got["job"], "check")
+        self.assertEqual([r["slot"] for r in got["results"]],
+                         [at("2026-11-04 06:00"), at("2026-11-03 09:30"), at("2026-11-03 06:00"),
+                          at("2026-11-02 06:00"), at("2026-11-01 06:00")])
+        self.assertEqual(got["results"][1]["manual"], True)
+
+    def test_history_keeps_the_last_results_the_state_keeps(self):
+        self.config()
+        self.results(*(state.result("check", at("2026-11-01 06:00") + i * 86400, state.PASSED)
+                       for i in range(state.KEEP + 5)))
+        _, out, _ = self.run_cli("history", "check", "--json")
+        self.assertEqual(len(json.loads(out)["results"]), state.KEEP)
+
+    def test_history_cleans_text_from_github(self):
+        self.config()
+        self.results(state.result("check", at("2026-11-02 06:00"), state.FAILED,
+                                  "the run ended \x1b]8;;evil\x07failure"))
+        _, out, _ = self.run_cli("history", "check")
+        self.assertNotIn("\x1b", out)
+        self.assertNotIn("\x07", out)
+        self.assertIn("failure", out)
+
+    def test_history_of_a_job_with_no_results_and_of_no_job(self):
+        self.config()
+        rc, out, _ = self.run_cli("history", "check")
+        self.assertEqual((rc, out), (0, "no results yet for check\n"))
+        rc, _, err = self.run_cli("history", "nope")
+        self.assertEqual(rc, 2)
+        self.assertIn("no job 'nope'", err)
+        self.assertIn("there are: check", err)
+
+    def test_history_of_a_removed_job_says_so(self):
+        self.config()
+        self.results(state.result("check", at("2026-11-02 06:00"), state.PASSED))
+        self.run_cli("remove", "check")
+        rc, out, _ = self.run_cli("history", "check")
+        self.assertEqual(rc, 0)
+        self.assertIn("check is no longer in the config", out)
+        self.assertIn("passed", out)
+
+    def test_history_runs_over_on(self):
+        self.assertIn("history", cli.commands())

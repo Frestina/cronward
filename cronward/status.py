@@ -215,6 +215,28 @@ def text(st: dict, now: float | None = None) -> str:
     return "\n".join(lines)
 
 
+def history(data: dict, name: str) -> list[dict]:
+    """The job's results in the state, newest first: the last state.KEEP final
+    ones, and any still running."""
+    return [r for r in reversed(data["results"]) if r["job"] == name]
+
+
+def history_text(name: str, results: list[dict]) -> str:
+    """One line per result, as history gives them: slot, result, why, run URL."""
+    if not results:
+        return f"no results yet for {name}"
+    lines = []
+    for r in results:
+        why = ", ".join(x for x in ("started by hand" if r.get("manual") else "", r["reason"])
+                        if x)
+        line = f"{when(r['slot']):<12}  {WORDS[r['kind']]:<10}"
+        for part in (why, r.get("url")):
+            if part:
+                line += f"  {part}"
+        lines.append(line.rstrip())
+    return "\n".join(lines)
+
+
 def all_passed(st: dict) -> bool:
     """For the exit code: every enabled job's latest result passed, and, on a
     viewer's copy, the main machine was reached and is ticking."""
