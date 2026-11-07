@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Posts a cronward notice to an ntfy topic, so it reaches your phone.
+
+An example for cronward's [notify] command, not part of cronward: cronward
+runs it with each notice as JSON on stdin, and it is this script, not
+cronward, that talks to the ntfy server you chose.
+
+    [notify]
+    command = ["/home/me/.local/share/cronward/examples/notify-ntfy"]
+
+It reads its settings from ~/.config/cronward/ntfy.env (or the file given
+as its one argument), which only you may read (chmod 600):
+
+    NTFY_TOPIC=cronward-a-long-random-name   # required
+    NTFY_SERVER=https://ntfy.sh              # default
+    NTFY_TOKEN=tk_...                        # optional: an access token
+
+On ntfy.sh anyone who knows the topic can read it, so make it long and
+random. A token is only sent over https.
+
+Exits 0 when the server took the notice, 1 when it did not, 2 when the
+settings or the notice do not read, saying why on stderr.
+"""
+
+import json
+import os
+import stat
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+KEYS = {"NTFY_TOPIC", "NTFY_SERVER", "NTFY_TOKEN"}
+TIMEOUT = 15  # cronward gives a notice command 30 seconds
+# ntfy's priorities: 3 is the default, 4 high.
+PRIORITY = {"failed": 4, "didnt_run": 4, "token": 4}
+
+
+class Problem(Exception):
+    """The settings or the notice do not read; says why."""
+
+
+def default_path() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "cronward" / "ntfy.env"
+
+
+def settings(path: Path) -> dict[str, str]:
+    """NTFY_TOPIC, NTFY_SERVER and, when set, NTFY_TOKEN from the file."""
+    try:
+        mode = path.stat().st_mode
+        text = path.read_text()
+    except FileNotFoundError:
+        raise Problem(f"no {path}; write it with NTFY_TOPIC=... and chmod 600 it") from None
+    except OSError as e:
+        raise Problem(f"cannot read {path}: {e.strerror}") from None
+    if mode & (stat.S_IRWXG | stat.S_IRWXO):
+        raise Problem(f"{path} can be read by others, and its topic or token is enough to "
+                      f"read your notices; chmod 600 {path}")
+    out: dict[str, str] = {}
+    for n, line in enumerate(text.splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, eq, value = line.partition("=")
+        key = key.strip()
+        if not eq or key not in KEYS:
+            raise Problem(f"{path} line {n}: not one of {', '.join(sorted(KEYS))}=VALUE")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        out[key] = value
+    if not out.get("NTFY_TOPIC"):
+        raise Problem(f"{path} has no NTFY_TOPIC")
+    server = out.setdefault("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+    out["NTFY_SERVER"] = server
+    scheme = urllib.parse.urlsplit(server).scheme
+    if scheme not in ("https", "http"):
+        raise Problem(f"NTFY_SERVER {server!r} is not an http or https address")
+    if out.get("NTFY_TOKEN") and scheme != "https":
+        raise Problem("NTFY_TOKEN is only sent over https; NTFY_SERVER is http")
+    return out
+
+
+def message(notice: object, topic: str) -> dict:
+    """ntfy's JSON for one of cronward's notices."""
+    if not isinstance(notice, dict) or not isinstance(notice.get("title"), str):
+        raise Problem("the notice on stdin is not a cronward notice")
+    out = {"topic": topic, "title": notice["title"], "message": str(notice.get("body", "")),
+           "priority": PRIORITY.get(notice.get("kind"), 3)}
+    url = notice.get("url")
+    if isinstance(url, str) and url.startswith("https://github.com/"):
+        out["click"] = url
+    return out
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    # A redirect would carry the token, and the notice, to another address.
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def send(cfg: dict[str, str], msg: dict, opener=None) -> None:
+    """Posts msg; urllib.error.URLError or OSError when it does not go."""
+    headers = {"Content-Type": "application/json"}
+    if cfg.get("NTFY_TOKEN"):
+        headers["Authorization"] = f"Bearer {cfg['NTFY_TOKEN']}"
+    req = urllib.request.Request(cfg["NTFY_SERVER"] + "/", data=json.dumps(msg).encode(),
+                                 headers=headers, method="POST")
+    opener = opener or urllib.request.build_opener(_NoRedirect)
+    with opener.open(req, timeout=TIMEOUT) as resp:
+        resp.read()
+
+
+def main(argv: list[str], stdin) -> int:
+    if len(argv) > 1:
+        print("usage: notify-ntfy [SETTINGS_FILE] < notice.json", file=sys.stderr)
+        return 2
+    try:
+        cfg = settings(Path(argv[0]) if argv else default_path())
+        try:
+            notice = json.load(stdin)
+        except ValueError:
+            raise Problem("the notice on stdin is not JSON") from None
+        msg = message(notice, cfg["NTFY_TOPIC"])
+    except Problem as e:
+        print(f"notify-ntfy: {e}", file=sys.stderr)
+        return 2
+    try:
+        send(cfg, msg)
+    except urllib.error.HTTPError as e:
+        print(f"notify-ntfy: {cfg['NTFY_SERVER']} answered {e.code} {e.reason}",
+              file=sys.stderr)
+        return 1
+    except (urllib.error.URLError, OSError) as e:
+        why = getattr(e, "reason", e)
+        print(f"notify-ntfy: cannot reach {cfg['NTFY_SERVER']}: {why}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:], sys.stdin))

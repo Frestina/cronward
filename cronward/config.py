@@ -80,7 +80,8 @@ desktop = true
 urgency = "critical"
 # A command run with each notice as JSON on stdin, such as a script that
 # posts to your phone. A string is split like a shell would split it.
-# command = ["/home/me/bin/post-to-ntfy"]
+# examples/notify-ntfy in cronward's folder posts to ntfy; the README says how.
+# command = ["/home/me/.local/share/cronward/examples/notify-ntfy"]
 """
 
 
