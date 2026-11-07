@@ -12,6 +12,7 @@
     cronward doctor                      check config, tokens, repos, workflows and timer
     cronward status [--json]             each job's latest result and next slot
     cronward status --host HOST [--json] the same, as a viewer last fetched it from HOST
+    cronward history JOB [--json]        a job's last 50 results, newest first
     cronward run JOB [--wait [TIME]]     start a job now, and with --wait, say how it went
     cronward tick [--dry-run]            what the timer runs
     cronward watch HOST                  what a viewer's timer runs
@@ -90,6 +91,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="exact data, for scripts")
     p.add_argument("--host", help="on a viewer: the status it last fetched from HOST, the "
                                   "main machine")
+    p = sub.add_parser("history", help="a job's last results, newest first")
+    p.add_argument("job")
+    p.add_argument("--json", action="store_true", help="exact data, for scripts")
     p = sub.add_parser("run", help="start a job now, outside its schedule")
     p.add_argument("job")
     p.add_argument("--wait", nargs="?", const="", metavar="TIME",
@@ -348,6 +352,22 @@ def cmd_status(as_json: bool, host: str | None) -> int:
     return EXIT_OK if status.all_passed(st) else EXIT_NOT_PASSED
 
 
+def cmd_history(name: str, as_json: bool) -> int:
+    cfg = config.load()
+    data = state.load()
+    results = status.history(data, name)
+    if not results:
+        cfg.job(name)  # says there is no such job, unless there is one with no results
+    if as_json:
+        json.dump({"job": name, "results": results}, sys.stdout, indent=1, sort_keys=True)
+        print()
+        return EXIT_OK
+    if not any(j.name == name for j in cfg.jobs):
+        print(f"note: {name} is no longer in the config; these are its results from before")
+    print(notify.clean(status.history_text(name, results)))
+    return EXIT_OK
+
+
 TOKENS_PAGE = "https://github.com/settings/personal-access-tokens"
 
 
@@ -585,6 +605,8 @@ def main(argv: list[str] | None = None) -> int:
             return doctor.run()
         if args.cmd == "status":
             return cmd_status(args.json, args.host)
+        if args.cmd == "history":
+            return cmd_history(args.job, args.json)
         if args.cmd == "run":
             return cmd_run(args.job, args.wait)
         if args.cmd == "tick":

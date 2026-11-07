@@ -221,6 +221,14 @@ time, the last 50 results of each job, and each account's token expiry. A
 state file that does not read stops every tick with an error until it is
 fixed or moved away. Moving it away starts every job afresh from that tick.
 
+`cronward history <job> [--json]` shows those results, newest first, one
+line each: the slot, the result, why, and the run's URL; a run still
+going shows as running. A job taken out of the config keeps its results, and
+`history` shows them with a note that it is no longer there. With `--json`,
+`{"job", "results": [<result>, ...]}`, the results as the state holds them.
+It reads the state only, so it exits 0 whatever the results are. On a
+viewer, it is `cronward --on <host> history <job>`.
+
 ## Notifications
 
 A notice goes out when a job's latest result changes kind: to failed or
@@ -334,6 +342,7 @@ in the config. It exits 2 when an account's repos could not be listed.
 | `cronward doctor` | Check config, tokens, repos, workflows, timer and lingering |
 | `cronward status [--json]` | Each job's latest result and next slot, and the last tick |
 | `cronward status --host <host> [--json]` | The same, as a viewer last fetched it from the main machine |
+| `cronward history <job> [--json]` | The job's last results, newest first |
 | `cronward run <job> [--wait [TIME]]` | Start a job now, and with `--wait`, say how it went |
 | `cronward tick [--dry-run]` | What the timer runs |
 | `cronward watch <host>` | What a viewer's timer runs |

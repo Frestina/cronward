@@ -338,6 +338,7 @@ cronward remove JOB                  take a job out of the config
 cronward doctor                      check config, tokens, repos, workflows and timer
 cronward status [--json]             each job's latest result and next slot
 cronward status --host HOST [--json] the same, as a viewer last fetched it from HOST
+cronward history JOB [--json]        a job's last 50 results, newest first
 cronward run JOB [--wait [TIME]]     start a job now, and with --wait, say how it went
 cronward tick [--dry-run]            what the timer runs
 cronward watch HOST                  what a viewer's timer runs

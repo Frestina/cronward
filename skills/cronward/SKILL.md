@@ -30,7 +30,7 @@ These steps work for any agent: they are shell commands and file edits.
 ## Find the machine cronward runs on
 
 Jobs live on the main machine, which holds the config and the tokens. Run
-`add`, `remove`, `run`, `status` and `doctor` there.
+`add`, `remove`, `run`, `status`, `history` and `doctor` there.
 
 1. If `systemctl --user cat cronward-tick.timer` succeeds, this is the main
    machine: run `cronward` here (`~/.local/bin/cronward` if it is not on
@@ -127,6 +127,9 @@ Jobs live on the main machine, which holds the config and the tokens. Run
   (`fetched`), and whether the main machine could not be reached
   (`unreachable_since`, `error`) or had stopped ticking. `cronward watch
   <host>` fetches it again.
+- **Past results:** `cronward history <job> --json`, the job's last 50
+  results newest first, each with `slot`, `kind`, `reason` and `url`, for
+  when a job has failed before or passes only sometimes.
 - **Take a job off:** `cronward remove <job>`. Put `schedule:` back in the
   workflow if GitHub should run it on its own again.
 - **Change a job:** `cronward remove <job>`, then `cronward add` it again
