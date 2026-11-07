@@ -96,10 +96,13 @@ Arch, Debian 12 and Ubuntu 24.04. Ubuntu 22.04 has Python 3.10, too old
 > with `systemctl --version`.
 
 ```sh
-git clone https://github.com/Frestina/cronward ~/Projects/cronward
-~/Projects/cronward/install.sh   # links cronward into ~/.local/bin, and the agent skill
-cronward init                     # writes ~/.config/cronward/config.toml
+git clone https://github.com/Frestina/cronward ~/.local/share/cronward
+~/.local/share/cronward/install.sh   # links cronward into ~/.local/bin, and the agent skill
+cronward init                        # writes ~/.config/cronward/config.toml
 ```
+
+> Any folder works, but cronward runs from it: keep it there, and use the
+> same folder in the commands below.
 
 ### 1. A token for each account
 
@@ -168,7 +171,7 @@ tells you which.
 ### Updating
 
 ```sh
-cd ~/Projects/cronward && git pull --ff-only && ./install.sh
+cd ~/.local/share/cronward && git pull --ff-only && ./install.sh
 cronward install    # again, so the timer gets any change to its units
 cronward doctor     # its first line says which cronward this is
 ```
