@@ -243,6 +243,14 @@ result of a new job makes no notice.
   list) is run with the notice as JSON on stdin, such as a script that posts
   to ntfy. cronward itself never talks to that host.
 
+`examples/notify-ntfy` is such a script, for a notice on a phone. It reads
+the topic, server and an optional access token from
+`~/.config/cronward/ntfy.env`, refuses that file when others can read it,
+sends a token only over https, and follows no redirect. Failed, didn't run
+and token notices get high priority, and a run's URL on github.com opens
+when the notice is tapped. It stays an example, not part of cronward,
+because it talks to a host the user chose.
+
 A tick that fails (a config or state that does not read, or anything
 unexpected) gives one notice for each new error. The next tick that works
 resets it, so the same error coming back is told again.

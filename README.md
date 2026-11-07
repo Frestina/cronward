@@ -244,6 +244,46 @@ back to passed. A job that keeps failing is one notice, not one an hour.
 - `notify.command`: any program, given the notice as JSON on stdin, such as
   a script that posts to your phone.
 
+### On your phone
+
+[examples/notify-ntfy](examples/notify-ntfy) posts each notice to an
+[ntfy](https://ntfy.sh) topic, which the ntfy app on your phone shows. A
+failed or didn't run notice comes with high priority, and opens the run
+when you tap it. It is an example, not part of cronward: it is this script
+that talks to the ntfy server, one you chose.
+
+1. In the ntfy app, subscribe to a topic with a long random name. On
+   ntfy.sh anyone who knows the name can read it, so treat it as a password.
+2. Put its settings in `~/.config/cronward/ntfy.env`, which only you may
+   read; the script refuses it otherwise:
+
+   ```sh
+   cat > ~/.config/cronward/ntfy.env <<'EOF'
+   NTFY_TOPIC=cronward-a-long-random-name
+   # NTFY_SERVER=https://ntfy.example.org   # your own; default https://ntfy.sh
+   # NTFY_TOKEN=tk_...                      # an access token, if it needs one
+   EOF
+   chmod 600 ~/.config/cronward/ntfy.env
+   ```
+
+3. Point the config at it, with the full path, as the command is not run
+   by a shell:
+
+   ```toml
+   [notify]
+   command = ["/home/me/.local/share/cronward/examples/notify-ntfy"]
+   ```
+
+4. Check it with a notice of your own:
+
+   ```sh
+   echo '{"title": "cronward: a test", "body": "from my machine"}' \
+     | ~/.local/share/cronward/examples/notify-ntfy
+   ```
+
+When the server cannot be reached, the tick's log says why
+(`journalctl --user -u cronward-tick`), and the desktop notice still comes.
+
 GitHub also emails the token's account about each failed run cronward
 started, as for any run you start, unless you turned that off (GitHub's
 Settings, Notifications, Actions). Those come for every failure;
@@ -376,9 +416,9 @@ The `XDG_*_HOME` variables move them. [SPEC.md](SPEC.md) has every rule.
 - **What cronward does with it**: starts runs, reads them, and turns on a
   workflow GitHub turned off for inactivity (unless `reenable = false`).
 - **Where it talks**: only `https://api.github.com`, fixed in the code; a
-  redirect to another host is refused. Your `notify.command`, and the
-  viewer's ssh and `--on`, are the only other traffic, and all are yours
-  to set up.
+  redirect to another host is refused. Your `notify.command` (such as the
+  ntfy example), and the viewer's ssh and `--on`, are the only other
+  traffic, and all are yours to set up.
 - **What runs on your machine**: cronward itself. Not a runner, so a pull
   request to a public repo can never run code here.
 
