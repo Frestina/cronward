@@ -109,7 +109,22 @@ def _left(proc: subprocess.Popen, group: bool) -> bool:
         return False
     except PermissionError:
         pass
-    return True
+    # A zombie counts for killpg, and one whose reaper never reaps (PID 1 in
+    # some containers) would hold the wait for all of GRACE.
+    try:
+        names = os.listdir("/proc")
+    except OSError:
+        return True
+    for name in names:
+        if not name.isdigit():
+            continue
+        try:
+            fields = open(f"/proc/{name}/stat").read().rsplit(")", 1)[1].split()
+        except (OSError, IndexError):
+            continue
+        if len(fields) > 2 and fields[2] == str(proc.pid) and fields[0] != "Z":
+            return True
+    return False
 
 
 def _stop(proc: subprocess.Popen, group: bool) -> None:
