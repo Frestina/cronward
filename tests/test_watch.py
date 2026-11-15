@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from cronward import cli, config, notify, remote, state, status
-from tests.harness import REPO, CronwardTest, at
+from tests.harness import REPO, CronwardTest, HangTest, at
 
 NOW = at("2026-11-03 07:08")
 
@@ -18,7 +18,7 @@ def rec(slot, kind, reason=""):
             "url": "https://github.com/me/widget/actions/runs/1"}
 
 
-class ViewerTest(CronwardTest):
+class ViewerTest(HangTest):
     """A main machine anvil, reached through the fake ssh."""
 
     def main_status(self, recent, last_tick=NOW - 120, error=None):
@@ -89,6 +89,15 @@ class WatchTest(ViewerTest):
         self.assertEqual(self.watch(NOW + 2700)[1], [])
         self.main_status([], last_tick=NOW + 3500)
         self.assertEqual(self.watch(NOW + 3600)[1], ["cronward: anvil is reachable again"])
+
+    def test_a_host_that_stops_answering_is_unreachable_and_nothing_is_left(self):
+        self.hang("anvil")
+        start = time.monotonic()
+        with mock.patch.object(notify, "TIMEOUT", 1), self.assertRaises(notify.Unreachable) as e:
+            notify.fetch("anvil")
+        self.assertLess(time.monotonic() - start, 5)
+        self.assertEqual(str(e.exception), "anvil gave no answer in 1s")
+        self.assertEqual(self.left(), [])
 
     def test_offline_says_nothing(self):
         (self.root / "offline").touch()

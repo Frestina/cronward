@@ -28,7 +28,7 @@ import subprocess
 import sys
 import time
 
-from cronward import config, state, status
+from cronward import config, remote, state, status
 from cronward.config import Config
 from cronward.state import DIDNT_RUN, FAILED, PASSED, WORDS
 
@@ -143,8 +143,8 @@ def fetch(host: str) -> dict:
     """The main machine's status, over one ssh call."""
     argv = [*SSH, "--", host, REMOTE]
     try:
-        done = subprocess.run(argv, capture_output=True, stdin=subprocess.DEVNULL,
-                              timeout=TIMEOUT)
+        done = remote.call(argv, timeout=TIMEOUT, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except OSError as e:
         raise Unreachable(f"cannot run ssh: {e.strerror}") from None
     except subprocess.TimeoutExpired:

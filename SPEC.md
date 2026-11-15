@@ -267,7 +267,10 @@ author sits at, hourly at :08: soon enough for jobs that run daily, and few
 logins on the main machine. It runs `cronward watch <host>`: one ssh call
 (batch mode, no agent, no forwarding) that reads the main machine's
 status.json with `cat`, so cronward need not be on the main machine's PATH
-for ssh. It needs no config and no token. The command it sends starts with
+for ssh. It needs no config and no token. The call has 30 seconds: then
+cronward stops ssh and whatever ssh started, such as a `ProxyCommand` (ssh
+runs in its own process group), and counts the main machine as not
+reached. The command it sends starts with
 `cat -- ` and keeps doing so: a viewer key limited in `authorized_keys` to
 reading the status (README) matches on it, and refuses the rest with exit
 1, so `--on` through such a key fails rather than looks done.
@@ -324,6 +327,21 @@ there, and says so when neither is there. The exit code is passed through;
 ssh's own failure (255) is 2. Output is passed through as it comes: the far
 side is cronward, which cleans what it prints.
 
+Time limits: ssh gives up connecting after 10 seconds, and on a connection
+that stops answering after about 30 (`ServerAliveInterval=10`,
+`ServerAliveCountMax=3`), which is ssh's failure, 2. Past that, `--on`
+waits for the far side as long as it takes; `workflows` on many repos can
+take a while. A caller that wants a deadline stops cronward: on SIGTERM,
+SIGHUP or SIGINT it stops its ssh too, TERM then KILL after 5 seconds, and
+exits 128 plus the signal (143 for SIGTERM). Without a terminal, ssh runs in
+its own process group, so that reaches whatever ssh started; with one, ssh
+stays in the terminal's group, for its prompts and Ctrl-C. Stopping the
+local ssh does not stop the command on the main machine, which runs on
+until it next writes: a stopped or timed-out `add`, `run`, `remove` or
+`token remove` may still have finished there, and cronward says so. Check
+with `--on <host> status` before trying again; `add` and `remove` say when
+the job is already there or already gone.
+
 `cronward edit` opens the config in `$VISUAL`, `$EDITOR`, or the first of
 nano, nvim, vim and vi that it finds, holding the config lock while it is
 open (an `add` meanwhile waits and says so), then checks that the config
@@ -364,7 +382,8 @@ the main machine cannot be reached or has stopped ticking (status), the
 start did not go through or with `--wait` the run did not pass (run),
 GitHub's check refused the job (add), a check failed (doctor), or the main
 machine was not reached (watch), 2 an error. With `--on`, the far side's
-code, or 2 when ssh failed.
+code, or 2 when ssh failed, or 128 plus the signal when cronward was
+stopped.
 
 ## Agents
 

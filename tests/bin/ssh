@@ -2,7 +2,10 @@
 # A fake ssh for tests. It records its arguments, then runs the remote
 # command here with HOME set to $CW_FAKE/homes/<target>, as real ssh would on
 # the far side. A target with no home is unreachable. While $CW_FAKE/offline
-# is there, this machine has no network.
+# is there, this machine has no network. A target with a file in
+# $CW_FAKE/hangs logs in, then stops answering, with a child (as a
+# ProxyCommand would be) that holds stdout and stderr open; the two pids go
+# to $CW_FAKE/pids.
 set -uo pipefail
 fake=${CW_FAKE:?fake ssh: CW_FAKE is not set}
 "$(dirname "$0")/record" ssh "$@"
@@ -14,6 +17,11 @@ shift 2
 if [[ -e $fake/offline ]]; then
   echo "ssh: connect to host $target port 22: Network is unreachable" >&2
   exit 255
+fi
+if [[ -e $fake/hangs/$target ]]; then
+  sleep 300 &
+  echo "$$ $!" >>"$fake/pids"
+  exec sleep 300
 fi
 home=$fake/homes/$target
 if [[ ! -d $home ]]; then

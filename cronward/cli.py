@@ -27,7 +27,11 @@ main machine cannot be reached or has stopped ticking (status), the start
 did not go through or with --wait the run did not pass (run), GitHub's check
 refused the job (add), a check failed (doctor) or the main machine was not
 reached (watch), 2 an error. With --on, the far side's exit code, or 2 when
-ssh failed.
+ssh failed, or 128 plus the signal when cronward was stopped.
+
+--on gives up on a connection that stops answering after about 30 s, and
+otherwise waits for HOST. Stopped (SIGTERM, SIGHUP, SIGINT), cronward stops
+its ssh too, but an add, run or remove may still have finished on HOST.
 """
 
 import argparse
@@ -59,7 +63,8 @@ def parser() -> argparse.ArgumentParser:
     out.add_argument("--version", action="version", version=f"cronward {__version__}")
     out.add_argument("--on", metavar="HOST",
                      help="run the command on HOST, the main machine, over your ssh; comes "
-                          "first")
+                          "first. A dropped connection fails in about 30 s; a stopped "
+                          "change may still have finished on HOST")
     sub = out.add_subparsers(dest="cmd", metavar="COMMAND", required=True)
     sub.add_parser("init", help="write the example config")
     sub.add_parser("edit", help="open the config in your editor, then check it")

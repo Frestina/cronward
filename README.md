@@ -323,6 +323,13 @@ with your keys and agent, so it needs a login on the server that can run
 commands, not only the viewer's read of the status. It runs only cronward
 there.
 
+A connection that drops fails within about 30 seconds. Otherwise `--on`
+waits for the server, so a script that wants a deadline can wrap it, as in
+`timeout 120 cronward --on homeserver workflows --json`: cronward then stops
+its ssh too. A stopped `add`, `run` or `remove` may still have finished on
+the server, so look with `cronward --on homeserver status` before trying
+again.
+
 ### A viewer key that only reads the status
 
 The viewer's timer needs a key without a passphrase. To keep that key from

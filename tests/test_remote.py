@@ -3,20 +3,22 @@ on both sides. Only commands that never talk to GitHub run on the far side."""
 
 import io
 import os
+import signal
 import subprocess
 import sys
+import time
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
 from cronward import cli, remote
-from tests.harness import BIN, JOB, CronwardTest
+from tests.harness import BIN, JOB, HangTest
 
 CRONWARD = Path(__file__).resolve().parent.parent / "bin" / "cronward"
 COMMANDS = cli.commands()
 
 
-class RemoteTest(CronwardTest):
+class RemoteTest(HangTest):
     def anvil(self, installed: bool = True, config: str | None = JOB) -> Path:
         home = self.root / "homes" / "anvil"
         if installed:
@@ -40,6 +42,8 @@ class RemoteTest(CronwardTest):
         self.assertIn("check: me/widget check.yml", out)
         [argv] = self.calls("ssh")
         self.assertEqual(argv[:4], ["-T", "-o", "BatchMode=yes", "-o"])
+        self.assertIn("ServerAliveInterval=10", argv)
+        self.assertIn("ServerAliveCountMax=3", argv)
         self.assertIn("exec \"$c\" status", argv[-1])
 
     def test_on_equals_host(self):
@@ -94,6 +98,7 @@ class RemoteTest(CronwardTest):
         argv = remote.command("anvil", ["token", "set", "personal"], COMMANDS, tty=True)
         self.assertEqual(argv[:2], ["ssh", "-t"])
         self.assertNotIn("BatchMode=yes", argv)
+        self.assertIn("ServerAliveInterval=10", argv)
         self.assertEqual(argv[-2:-1], ["anvil"])
         self.assertTrue(argv[-1].endswith('exec "$c" token set personal'))
 
@@ -102,3 +107,42 @@ class RemoteTest(CronwardTest):
         with redirect_stdout(io.StringIO()), redirect_stderr(err):
             self.assertEqual(cli.main(["--on", "anvil"]), 2)
         self.assertIn("--on anvil needs a command", err.getvalue())
+
+    def test_sigterm_stops_ssh_and_what_it_started(self):
+        self.hang("anvil")
+        proc = subprocess.Popen([sys.executable, str(CRONWARD), "--on", "anvil", "workflows",
+                                 "--json"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True)
+        self.addCleanup(proc.kill)
+        self.assertEqual(len(self.pids()), 2)
+        proc.send_signal(signal.SIGTERM)
+        _, err = proc.communicate(timeout=10)
+        self.assertEqual(proc.returncode, 128 + signal.SIGTERM, err)
+        self.assertIn("workflows may still have finished on anvil", err)
+        self.assertEqual(self.left(), [])
+
+    def test_sighup_too(self):
+        self.hang("anvil")
+        proc = subprocess.Popen([sys.executable, str(CRONWARD), "--on", "anvil", "status"],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        self.addCleanup(proc.kill)
+        self.pids()
+        proc.send_signal(signal.SIGHUP)
+        proc.communicate(timeout=10)
+        self.assertEqual(proc.returncode, 128 + signal.SIGHUP)
+        self.assertEqual(self.left(), [])
+
+    def test_a_timeout_stops_the_group_and_does_not_wait_for_the_pipes(self):
+        self.hang("anvil")
+        start = time.monotonic()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            remote.call(["ssh", "--", "anvil", "true"], timeout=1, stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertLess(time.monotonic() - start, 5)
+        self.assertEqual(self.left(), [])
+
+    def test_call_puts_the_signal_handlers_back(self):
+        before = signal.getsignal(signal.SIGTERM)
+        self.assertEqual(remote.call(["true"]).returncode, 0)
+        self.assertIs(signal.getsignal(signal.SIGTERM), before)

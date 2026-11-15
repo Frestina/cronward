@@ -15,7 +15,9 @@ import datetime
 import json
 import os
 import shutil
+import signal
 import tempfile
+import time
 import unittest
 import urllib.parse
 from pathlib import Path
@@ -205,3 +207,41 @@ def _no_sleep_init(gh: FakeGitHub):
     def init(self, token, transport=None, sleep=None):
         real(self, token, transport or gh, sleep=lambda s: None)
     return init
+
+
+def alive(pid: str) -> bool:
+    """Whether a process is there and not a zombie waiting for its reaper."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    except (FileNotFoundError, IndexError):
+        return False
+
+
+class HangTest(CronwardTest):
+    """A host that logs in, then stops answering: the fake ssh's hangs."""
+
+    def hang(self, host: str) -> None:
+        (self.root / "hangs").mkdir(exist_ok=True)
+        (self.root / "hangs" / host).touch()
+        self.addCleanup(self._kill_left)
+
+    def pids(self, wait: float = 10) -> list[str]:
+        path = self.root / "pids"
+        end = time.monotonic() + wait
+        while not path.exists() and time.monotonic() < end:
+            time.sleep(0.05)
+        return path.read_text().split() if path.exists() else []
+
+    def left(self) -> list[str]:
+        """What the fake ssh started that is still running, after a short wait."""
+        end = time.monotonic() + 2
+        while (left := [p for p in self.pids(0) if alive(p)]) and time.monotonic() < end:
+            time.sleep(0.05)
+        return left
+
+    def _kill_left(self):
+        for pid in self.pids(0):
+            try:
+                os.kill(int(pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
