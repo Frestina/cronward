@@ -13,19 +13,19 @@ A result is one slot of one job:
      "last": <time>, "count": <n>}   # last and count only for missed slots
      "manual": true                  # only for `cronward run`
 
-Times are Unix timestamps. Writes are atomic, and every change happens
-under locked(), so a tick and `cronward run` never overlap.
+Times are Unix timestamps. Writes are atomic (files.write_atomic), and
+every change happens under locked(), so a tick and `cronward run` never
+overlap.
 """
 
 import contextlib
 import fcntl
 import json
-import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-from cronward import config
+from cronward import config, files
 
 VERSION = 1
 KEEP = 50  # results kept per job
@@ -62,8 +62,7 @@ def empty() -> dict:
 
 @contextlib.contextmanager
 def locked(wait: bool = False) -> Iterator[None]:
-    config.state_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
-    with open(config.state_dir() / "lock", "w") as f:
+    with files.open_lock(files.private_dir(config.state_dir()) / "lock") as f:
         try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -94,14 +93,8 @@ def load() -> dict:
 
 
 def write_json(p: Path, data: dict) -> None:
-    p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    tmp = p.with_name(f".{p.name}.tmp")
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=1, sort_keys=True)
-        f.write("\n")
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, p)
+    files.private_dir(p.parent)
+    files.write_atomic(p, json.dumps(data, indent=1, sort_keys=True) + "\n")
 
 
 def save(data: dict) -> None:

@@ -9,7 +9,7 @@ import platform
 import shutil
 import time
 
-from cronward import __version__, config, cron, state, status, timers, tokens
+from cronward import __version__, config, cron, files, state, status, timers, tokens
 from cronward.config import ConfigError
 from cronward.github import GitHubError, HTTPProblem
 from cronward.notify import clean
@@ -111,6 +111,12 @@ def run(make: MakeClient = default_client) -> int:
         r.warn(f"notices from this machine reach no one: {why}, and notify.command is not "
                "set. Fine if a viewer watches it (cronward install --viewer HOST on your "
                "laptop); otherwise set notify.command in the config")
+
+    if config.state_dir().exists():
+        try:
+            files.check_private(config.state_dir())
+        except files.Unsafe as e:
+            r.fail(str(e))
 
     try:
         tick_state = timers.active(timers.TICK.name)

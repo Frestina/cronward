@@ -13,10 +13,11 @@ import re
 import shutil
 import stat
 import subprocess
+import tempfile
 import textwrap
 from pathlib import Path
 
-from cronward import config
+from cronward import config, files
 
 TIMEOUT = 30
 NEEDED = 256  # the first systemd with systemd-creds --user
@@ -86,7 +87,9 @@ def store(account: str, token: str) -> tuple[str, str | None]:
     old = os.umask(0o077)
     try:
         if shutil.which("systemd-creds"):
-            tmp = cred.with_name(f".{cred.name}.tmp")
+            fd, name = tempfile.mkstemp(dir=token_dir(), prefix=f".{cred.name}.")
+            os.close(fd)
+            tmp = Path(name)
             try:
                 done = _creds("encrypt", f"--name=cronward-{account}", "-", str(tmp),
                               data=token.encode())
@@ -103,10 +106,7 @@ def store(account: str, token: str) -> tuple[str, str | None]:
             why = why_plain(why.splitlines()[-1] if why else "")
         else:
             why = why_plain()
-        tmp = plain.with_name(f".{plain.name}.tmp")
-        tmp.write_text(token + "\n")  # 0600 from the start, by the umask
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, plain)
+        files.write_atomic(plain, token + "\n")  # 0600 from the start
         cred.unlink(missing_ok=True)
         return f"in {plain}, readable only by you, not encrypted", why
     finally:

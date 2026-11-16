@@ -21,7 +21,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from cronward import config
+from cronward import config, files
 
 MARK = "# Written by cronward install; cronward uninstall removes it."
 COMMAND = Path(__file__).resolve().parent.parent / "bin" / "cronward"
@@ -146,9 +146,7 @@ def install(viewer: str | None = None) -> int:
                               "nothing was installed")
     where.mkdir(parents=True, exist_ok=True)
     for name, text in texts.items():
-        tmp = where / f".{name}.tmp"
-        tmp.write_text(text)
-        os.replace(tmp, where / name)
+        files.write_atomic(where / name, text, 0o644)
     _systemctl("daemon-reload")
     _systemctl("enable", "--now", f"{t.name}.timer")
     print(f"installed {t.name}.timer: {t.what} ({'; '.join(t.schedule)})")

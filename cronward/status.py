@@ -15,7 +15,7 @@ import datetime
 import socket
 import time
 
-from cronward import config, cron, state, tokens
+from cronward import config, cron, files, state, tokens
 from cronward.config import Config, ConfigError
 from cronward.state import PASSED, WORDS
 
@@ -141,7 +141,7 @@ def refresh() -> None:
         cfg = config.load()
         with state.locked(wait=True):
             write(cfg, state.load())
-    except (ConfigError, state.StateError, OSError):
+    except (ConfigError, state.StateError, files.Unsafe, OSError):
         pass
 
 

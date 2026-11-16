@@ -46,8 +46,8 @@ import sys
 import time
 import traceback
 
-from cronward import (__version__, config, cron, doctor, notify, remote, state, status, tick,
-                      timers, tokens)
+from cronward import (__version__, config, cron, doctor, files, notify, remote, state, status,
+                      tick, timers, tokens)
 from cronward.config import ConfigError
 from cronward.github import Client, GitHubError, HTTPProblem
 
@@ -118,11 +118,17 @@ def parser() -> argparse.ArgumentParser:
 
 def cmd_init() -> int:
     path = config.config_path()
-    if path.exists():
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        files.create_new(path, config.TEMPLATE)
+    except FileExistsError:
+        if path.is_symlink() and not path.exists():
+            print(f"{path} is a symlink to {os.readlink(path)}, which is not there; nothing "
+                  "written, as cronward init does not write through a symlink. Move the "
+                  "symlink away, run cronward init, then move the file where you want it")
+            return EXIT_ERROR
         print(f"{path} is there already; nothing written")
         return EXIT_OK
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(config.TEMPLATE)
     print(f"wrote {path}\n"
           "Next: store a token for each account with `cronward token set <account>`, "
           "add jobs with `cronward add` (or in the file), check with `cronward doctor`, "
@@ -556,7 +562,7 @@ def cmd_tick(dry: bool) -> int:
     except state.Busy as e:
         print(f"{e}; this tick does nothing")
         return EXIT_OK
-    except state.StateError as e:
+    except (state.StateError, files.Unsafe) as e:
         notify.send(tick.failed(cfg, str(e)), cfg)
         raise
     except Exception as e:
@@ -622,7 +628,7 @@ def main(argv: list[str] | None = None) -> int:
             return timers.install(args.viewer)
         if args.cmd == "uninstall":
             return timers.uninstall()
-    except (ConfigError, state.StateError, state.Busy, timers.TimersError) as e:
+    except (ConfigError, state.StateError, state.Busy, timers.TimersError, files.Unsafe) as e:
         print(f"cronward: {e}", file=sys.stderr)
         return EXIT_ERROR
     except KeyboardInterrupt:

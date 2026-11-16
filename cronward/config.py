@@ -26,7 +26,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cronward import cron
+from cronward import cron, files
 
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 REPO = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}")
@@ -439,8 +439,7 @@ def without_job(text: str, name: str) -> str:
 def editing() -> Iterator[None]:
     """Held from reading the config's text to saving the change. Kept in the
     state folder, as the config's folder may be a dotfiles repo."""
-    state_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
-    with open(state_dir() / "config-lock", "w") as f:
+    with files.open_lock(files.private_dir(state_dir()) / "config-lock") as f:
         try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -454,7 +453,4 @@ def save(text: str) -> None:
     """Replaces the config atomically. Writes through a symlink, so a config
     kept in a dotfiles repo stays there."""
     real = config_path().resolve()
-    tmp = real.with_name(f".{real.name}.tmp")
-    tmp.write_text(text)
-    os.chmod(tmp, real.stat().st_mode & 0o7777)
-    os.replace(tmp, real)
+    files.write_atomic(real, text, real.stat().st_mode & 0o7777)

@@ -56,7 +56,9 @@ Only `success` is passed. Nothing unknown is ever shown as passed.
 ## Config
 
 `~/.config/cronward/config.toml` (`$XDG_CONFIG_HOME`). `cronward init`
-writes a commented example. Unknown keys are errors, so a typo is caught.
+writes a commented example, and nothing when anything is at that path, a
+symlink too, even one to a file that is not there. Unknown keys are errors,
+so a typo is caught.
 
 `cronward add` adds a job, and `cronward remove` takes one out. Both change
 the file's text, so its comments stay, write through a symlink, and read the
@@ -220,6 +222,16 @@ The state (`~/.local/state/cronward/state.json`) holds each job's `through`
 time, the last 50 results of each job, and each account's token expiry. A
 state file that does not read stops every tick with an error until it is
 fixed or moved away. Moving it away starts every job afresh from that tick.
+
+The state, status.json, the locks and a viewer's copies are kept in
+`~/.local/state/cronward`, a folder only the user can write to. When it
+belongs to someone else, or others can write to it, cronward uses nothing in
+it: each command says so and what to do, a tick gives a notice, and `doctor`
+fails. Every file cronward replaces (the state, status.json, the config, the
+units, a token) goes to a new temp file with a unique name next to it, then
+is renamed into place, and a lock is opened without truncating it or
+following a symlink. So a name planted in a folder never leads a write to
+another file.
 
 `cronward history <job> [--json]` shows those results, newest first, one
 line each: the slot, the result, why, and the run's URL; a run still

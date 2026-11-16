@@ -11,7 +11,7 @@ import datetime
 import time
 from collections.abc import Callable
 
-from cronward import cron, notify, state, status, tokens
+from cronward import cron, files, notify, state, status, tokens
 from cronward.config import Config, Job
 from cronward.github import Client, GitHubError, HTTPProblem, NoAnswer, NotSent
 from cronward.state import DIDNT_RUN, FAILED, PASSED, PENDING
@@ -315,10 +315,13 @@ def failed(cfg: Config, why: str) -> list[dict]:
             data["tick_error"] = why
             state.save(data)
             status.write(cfg, data)
-    except (state.StateError, OSError):
+    except (state.StateError, files.Unsafe, OSError):
         status_only = state.empty()
         status_only["tick_error"] = why
-        state.write_json(state.status_path(), status.build(cfg, status_only))
+        try:
+            state.write_json(state.status_path(), status.build(cfg, status_only))
+        except (files.Unsafe, OSError):
+            pass  # the notice still goes
     told = state.error_told_path()
     try:
         if told.read_text() == why:
@@ -326,8 +329,9 @@ def failed(cfg: Config, why: str) -> list[dict]:
     except OSError:
         pass
     try:
-        told.write_text(why)
-    except OSError:
+        files.check_private(told.parent)
+        files.write_atomic(told, why)
+    except (files.Unsafe, OSError):
         pass
     return [{"title": "cronward: a tick failed", "body": notify.clean(why), "kind": "tick"}]
 
