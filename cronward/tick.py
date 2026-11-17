@@ -7,6 +7,7 @@ tick, which looks for a run GitHub may have started for it before calling
 it didn't run. See SPEC.md, "A tick".
 """
 
+import contextlib
 import datetime
 import time
 from collections.abc import Callable
@@ -15,7 +16,7 @@ from cronward import cron, files, notify, state, status, tokens
 from cronward.config import Config, Job
 from cronward.github import Client, GitHubError, HTTPProblem, NoAnswer, NotSent
 from cronward.state import DIDNT_RUN, FAILED, PASSED, PENDING
-from cronward.status import when
+from cronward.status import link, when
 
 LOOK_FOR = 600  # seconds to look for a run GitHub may have started
 FAILED_CONCLUSIONS = ("failure", "timed_out", "startup_failure")
@@ -165,7 +166,7 @@ def start(cfg: Config, job: Job, rec: dict, clients: Clients, data: dict, now: f
         details, rec["looking"] = None, str(e)
     if isinstance(details, dict) and isinstance(details.get("workflow_run_id"), int):
         rec["run_id"] = details["workflow_run_id"]
-        rec["url"] = details.get("html_url")
+        rec["url"] = link(details.get("html_url"))
         return
     rec.setdefault("looking", "GitHub did not say which run it started")
     _adopt(client, job, rec, data)
@@ -185,7 +186,7 @@ def _adopt(client: Client, job: Job, rec: dict, data: dict) -> None:
     if fits:
         _, run = min(fits, key=lambda f: f[0])
         rec["run_id"] = run["id"]
-        rec["url"] = run.get("html_url")
+        rec["url"] = link(run.get("html_url"))
         rec.pop("looking", None)
 
 
@@ -219,7 +220,7 @@ def follow(job: Job | None, rec: dict, clients: Clients, data: dict, now: float)
                                    f"cannot read the run: {e}", now)
         return
     rec.pop("last_error", None)
-    rec["url"] = run.get("html_url") or rec["url"]
+    rec["url"] = link(run.get("html_url")) or rec["url"]
     status = run.get("status")
     if status == "completed":
         c = run.get("conclusion")
@@ -268,7 +269,8 @@ def run(cfg: Config, make: MakeClient = default_client, now: float | None = None
                         finished.append(rec)
             data["last_tick"] = now
             data["tick_error"] = None
-            state.error_told_path().unlink(missing_ok=True)
+            with state.folder() as d:
+                d.unlink(state.TOLD)
 
         for account, client in clients.made.items():
             if client.answered:
@@ -319,20 +321,20 @@ def failed(cfg: Config, why: str) -> list[dict]:
         status_only = state.empty()
         status_only["tick_error"] = why
         try:
-            state.write_json(state.status_path(), status.build(cfg, status_only))
+            state.write_json(state.STATUS, status.build(cfg, status_only))
         except (files.Unsafe, OSError):
             pass  # the notice still goes
-    told = state.error_told_path()
+    told = None
     try:
-        if told.read_text() == why:
-            return []
-    except OSError:
-        pass
-    try:
-        files.check_private(told.parent)
-        files.write_atomic(told, why)
+        with state.folder() as d:
+            with contextlib.suppress(OSError, files.Unsafe):
+                told = d.read_text(state.TOLD)
+            if told != why:
+                d.write(state.TOLD, why)
     except (files.Unsafe, OSError):
         pass
+    if told == why:
+        return []
     return [{"title": "cronward: a tick failed", "body": notify.clean(why), "kind": "tick"}]
 
 

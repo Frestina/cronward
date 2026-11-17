@@ -72,9 +72,11 @@ class HostTest(unittest.TestCase):
         handler = github._SameHost()
         req = urllib.request.Request("https://api.github.com/repos/me/old")
         hdrs = email.message.Message()
-        with self.assertRaises(urllib.error.HTTPError) as refused:
-            handler.redirect_request(req, None, 301, "Moved", hdrs, "https://evil.example/x")
-        refused.exception.close()
+        for elsewhere in ("https://evil.example/x", "http://api.github.com/repositories/1",
+                          "https://api.github.com:8443/repositories/1"):
+            with self.assertRaises(urllib.error.HTTPError) as refused:
+                handler.redirect_request(req, None, 301, "Moved", hdrs, elsewhere)
+            refused.exception.close()
         same = handler.redirect_request(req, None, 301, "Moved", hdrs,
                                         "https://api.github.com/repositories/1")
         self.assertEqual(same.full_url, "https://api.github.com/repositories/1")

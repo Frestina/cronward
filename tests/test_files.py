@@ -21,6 +21,11 @@ class FilesTest(CronwardTest):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.symlink_to(self.target)
 
+    def state_folder(self):
+        with files.private_folder(config.state_dir()):
+            pass
+        return config.state_dir()
+
     def untouched(self):
         self.assertEqual(self.target.read_text(), "precious\n")
 
@@ -31,11 +36,11 @@ class FilesTest(CronwardTest):
         return rc, out.getvalue(), err.getvalue()
 
     def test_state_and_status_are_not_written_through_the_old_temp_names(self):
-        folder = files.private_dir(config.state_dir())
+        folder = self.state_folder()
         for name in (".state.json.tmp", ".status.json.tmp"):
             self.plant(folder / name)
         state.save(state.empty())
-        state.write_json(state.status_path(), {"version": 1})
+        state.write_json(state.STATUS, {"version": 1})
         self.untouched()
         self.assertEqual(json.loads(state.path().read_text())["version"], state.VERSION)
         self.assertTrue((folder / ".state.json.tmp").is_symlink())
@@ -43,7 +48,7 @@ class FilesTest(CronwardTest):
                          [".state.json.tmp", ".status.json.tmp", "state.json", "status.json"])
 
     def test_a_symlink_at_a_lock_is_refused_and_not_followed(self):
-        folder = files.private_dir(config.state_dir())
+        folder = self.state_folder()
         self.plant(folder / "lock")
         self.plant(folder / "config-lock")
         with self.assertRaisesRegex(files.Unsafe, "lock is a symlink"):
@@ -55,7 +60,7 @@ class FilesTest(CronwardTest):
         self.untouched()
 
     def test_a_lock_that_is_there_is_not_truncated(self):
-        lock = files.private_dir(config.state_dir()) / "lock"
+        lock = self.state_folder() / "lock"
         lock.write_text("left\n")
         with state.locked():
             pass
@@ -99,7 +104,7 @@ class FilesTest(CronwardTest):
 
     def test_the_error_told_marker_is_not_written_through(self):
         self.config()
-        folder = files.private_dir(config.state_dir())
+        folder = self.state_folder()
         state.path().write_text("{not json")
         self.plant(folder / "tick-error-told")
         rc, _, err = self.run_cli("tick")
@@ -109,7 +114,7 @@ class FilesTest(CronwardTest):
 
     def test_a_state_folder_others_can_write_to_is_refused(self):
         self.config()
-        folder = files.private_dir(config.state_dir())
+        folder = self.state_folder()
         os.chmod(folder, 0o770)
         rc, _, err = self.run_cli("tick")
         self.assertEqual(rc, 2)
@@ -124,15 +129,17 @@ class FilesTest(CronwardTest):
         self.assertIn("can be written by others", out)
 
     def test_a_state_folder_of_someone_else_is_refused(self):
-        folder = files.private_dir(config.state_dir())
-        real = os.stat
-        def stat(path, *a, **kw):
-            st = real(path, *a, **kw)
-            if str(path) == str(folder):
+        folder = self.state_folder()
+        ino = folder.stat().st_ino
+        real = os.fstat
+
+        def fstat(fd):
+            st = real(fd)
+            if st.st_ino == ino:
                 return os.stat_result((st.st_mode, st.st_ino, st.st_dev, st.st_nlink,
                                        os.getuid() + 1, *st[5:10]))
             return st
-        with mock.patch("os.stat", stat):
+        with mock.patch("os.fstat", fstat):
             with self.assertRaisesRegex(files.Unsafe, "belongs to someone else"):
                 state.save(state.empty())
         self.assertFalse(state.path().exists())

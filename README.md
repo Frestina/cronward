@@ -423,11 +423,16 @@ The `XDG_*_HOME` variables move them. [SPEC.md](SPEC.md) has every rule.
 - **What cronward does with it**: starts runs, reads them, and turns on a
   workflow GitHub turned off for inactivity (unless `reenable = false`).
 - **Where it talks**: only `https://api.github.com`, fixed in the code; a
-  redirect to another host is refused. Your `notify.command` (such as the
+  redirect to another host, or to plain http, is refused. Your `notify.command` (such as the
   ntfy example), and the viewer's ssh and `--on`, are the only other
   traffic, and all are yours to set up.
 - **What runs on your machine**: cronward itself. Not a runner, so a pull
   request to a public repo can never run code here.
+- **Its files**: cronward uses a folder only when it, and every folder and
+  symlink on the way to it, belongs to you or root and no one else can
+  write to it, and it never reads or writes a file through a symlink there.
+  The config included, as `notify.command` runs what it says. When one
+  fails, cronward says which and how to fix it, and `doctor` fails.
 
 To report a security problem, see [SECURITY.md](SECURITY.md).
 

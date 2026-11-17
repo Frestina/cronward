@@ -6,6 +6,10 @@ the file is only readable by this user on this machine: <account>.cred.
 Without it, a plain file only the user can read: <account>.token. That is
 the case on Ubuntu 24.04 and Debian 12, so `token set` and `doctor` say it
 loudly, with why and what to do.
+
+The folder is one of cronward's own (files.private_folder), and every file
+in it is read and written through it: systemd-creds reads and writes the
+credential on stdin and stdout, never by a path.
 """
 
 import os
@@ -13,7 +17,6 @@ import re
 import shutil
 import stat
 import subprocess
-import tempfile
 import textwrap
 from pathlib import Path
 
@@ -31,8 +34,17 @@ def token_dir() -> Path:
     return config.data_dir() / "tokens"
 
 
-def _paths(account: str) -> tuple[Path, Path]:
-    return token_dir() / f"{account}.cred", token_dir() / f"{account}.token"
+def _names(account: str) -> tuple[str, str]:
+    return f"{account}.cred", f"{account}.token"
+
+
+def _folder(make: bool = False) -> files.Folder:
+    """The token folder, open. FileNotFoundError when it is not there and
+    not make; TokenError when it is not safe to use."""
+    try:
+        return files.private_folder(token_dir(), make=make)
+    except files.Unsafe as e:
+        raise TokenError(str(e)) from None
 
 
 def _creds(*args: str, data: bytes | None = None) -> subprocess.CompletedProcess:
@@ -81,43 +93,59 @@ def warning(account: str, why: str) -> str:
 
 def store(account: str, token: str) -> tuple[str, str | None]:
     """Stores the token. Says where, and why it is not encrypted (None if it is)."""
-    cred, plain = _paths(account)
-    token_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(token_dir(), 0o700)  # mkdir leaves a folder that was there as it was
-    old = os.umask(0o077)
-    try:
+    cred, plain = _names(account)
+    with files.private_folder(token_dir()) as d:
+        os.fchmod(d.fd, 0o700)  # one that was there may be readable by others
         if shutil.which("systemd-creds"):
-            fd, name = tempfile.mkstemp(dir=token_dir(), prefix=f".{cred.name}.")
-            os.close(fd)
-            tmp = Path(name)
             try:
-                done = _creds("encrypt", f"--name=cronward-{account}", "-", str(tmp),
+                done = _creds("encrypt", f"--name=cronward-{account}", "-", "-",
                               data=token.encode())
             except (OSError, subprocess.TimeoutExpired) as e:
                 done = None
                 why = str(e)
             else:
                 why = done.stderr.decode(errors="replace").strip()
+            if done is not None and done.returncode == 0 and done.stdout:
+                d.write(cred, done.stdout)
+                d.unlink(plain)
+                return f"encrypted with systemd-creds in {token_dir() / cred}", None
             if done is not None and done.returncode == 0:
-                os.replace(tmp, cred)
-                plain.unlink(missing_ok=True)
-                return f"encrypted with systemd-creds in {cred}", None
-            tmp.unlink(missing_ok=True)
+                why = "it wrote nothing"
             why = why_plain(why.splitlines()[-1] if why else "")
         else:
             why = why_plain()
-        files.write_atomic(plain, token + "\n")  # 0600 from the start
-        cred.unlink(missing_ok=True)
-        return f"in {plain}, readable only by you, not encrypted", why
-    finally:
-        os.umask(old)
+        d.write(plain, token + "\n")  # 0600 from the start
+        d.unlink(cred)
+        return f"in {token_dir() / plain}, readable only by you, not encrypted", why
+
+
+def _read(account: str) -> tuple[bytes | None, bytes | None, int]:
+    """The account's credential, or else its plain token with its mode."""
+    cred, plain = _names(account)
+    try:
+        d = _folder()
+    except FileNotFoundError:
+        return None, None, 0
+    try:
+        with d:
+            try:
+                return d.read(cred), None, 0
+            except FileNotFoundError:
+                pass
+            try:
+                with d.open(plain) as f:
+                    return None, f.read(), os.fstat(f.fileno()).st_mode
+            except FileNotFoundError:
+                return None, None, 0
+    except (files.Unsafe, OSError) as e:
+        raise TokenError(f"cannot read the token for {account}: {e}") from None
 
 
 def load(account: str) -> str:
-    cred, plain = _paths(account)
-    if cred.exists():
+    sealed, text, mode = _read(account)
+    if sealed is not None:
         try:
-            done = _creds("decrypt", f"--name=cronward-{account}", str(cred), "-")
+            done = _creds("decrypt", f"--name=cronward-{account}", "-", "-", data=sealed)
         except (OSError, subprocess.TimeoutExpired) as e:
             raise TokenError(f"cannot decrypt the token for {account}: {e}") from None
         if done.returncode != 0:
@@ -125,12 +153,12 @@ def load(account: str) -> str:
             raise TokenError(f"cannot decrypt the token for {account}: "
                              f"{why[-1] if why else 'systemd-creds failed'}; store it again "
                              f"with: cronward token set {account}")
-        token = done.stdout.decode().strip()
-    elif plain.exists():
-        mode = plain.stat().st_mode
+        token = done.stdout.decode(errors="replace").strip()
+    elif text is not None:
         if mode & (stat.S_IRWXG | stat.S_IRWXO):
+            plain = token_dir() / _names(account)[1]
             raise TokenError(f"{plain} can be read by others; fix with: chmod 600 {plain}")
-        token = plain.read_text().strip()
+        token = text.decode(errors="replace").strip()
     else:
         raise TokenError(f"no token for {account}; store one with: cronward token set {account}")
     if not token:
@@ -140,15 +168,32 @@ def load(account: str) -> str:
 
 
 def kind(account: str) -> str | None:
-    """"encrypted", "plain" or None, for doctor."""
-    cred, plain = _paths(account)
-    return "encrypted" if cred.exists() else "plain" if plain.exists() else None
+    """"encrypted", "plain" or None, for doctor and status. None too when the
+    folder is not safe to use; load and doctor say why."""
+    cred, plain = _names(account)
+    try:
+        with _folder() as d:
+            return "encrypted" if d.exists(cred) else "plain" if d.exists(plain) else None
+    except (FileNotFoundError, TokenError):
+        return None
+
+
+def check() -> str | None:
+    """Why the token folder is not safe to use, or None, for doctor."""
+    try:
+        _folder().close()
+    except FileNotFoundError:
+        pass
+    except TokenError as e:
+        return str(e)
+    return None
 
 
 def remove(account: str) -> bool:
-    found = False
-    for p in _paths(account):
-        if p.exists():
-            p.unlink()
-            found = True
-    return found
+    try:
+        d = files.private_folder(token_dir(), make=False)
+    except FileNotFoundError:
+        return False
+    with d:
+        found = [d.unlink(name) for name in _names(account)]
+    return any(found)

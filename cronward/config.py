@@ -14,12 +14,10 @@ change.
 import contextlib
 import dataclasses
 import datetime
-import fcntl
 import json
 import os
 import re
 import shlex
-import sys
 import tomllib
 import zoneinfo
 from collections.abc import Iterator
@@ -291,17 +289,36 @@ def parse(text: str, where: str = "config") -> Config:
     )
 
 
+def read_text() -> str:
+    """The config's text. It decides what runs (notify.command), so it is read
+    only when it, its folder and every folder and symlink on the way belong
+    to the user or root and no one else can write to them. FileNotFoundError
+    when there is none."""
+    path = config_path()
+    try:
+        folder, name = files.resolve(path)
+        with folder, folder.open(name) as f:
+            files.check_file(folder, f, name)
+            return f.read().decode()
+    except FileNotFoundError:
+        raise
+    except files.Unsafe as e:
+        raise ConfigError(f"cronward does not read the config: {e}") from None
+    except UnicodeDecodeError:
+        raise ConfigError(f"{path} is not UTF-8 text") from None
+    except OSError as e:
+        raise ConfigError(f"cannot read {path}: {e.strerror}") from None
+
+
 def load(required: bool = True) -> Config:
     """The config; with required=False, the defaults when there is none."""
     path = config_path()
     try:
-        text = path.read_text()
+        text = read_text()
     except FileNotFoundError:
         if required:
             raise ConfigError(f"no config at {path}; write one with: cronward init") from None
         return Config()
-    except OSError as e:
-        raise ConfigError(f"cannot read {path}: {e.strerror}") from None
     return parse(text, str(path))
 
 
@@ -439,18 +456,18 @@ def without_job(text: str, name: str) -> str:
 def editing() -> Iterator[None]:
     """Held from reading the config's text to saving the change. Kept in the
     state folder, as the config's folder may be a dotfiles repo."""
-    with files.open_lock(files.private_dir(state_dir()) / "config-lock") as f:
-        try:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print("waiting for another cronward (add, remove or edit) to finish with the "
-                  "config", file=sys.stderr, flush=True)
-            fcntl.flock(f, fcntl.LOCK_EX)
+    from cronward import state  # state reads the config's paths
+    with state.hold("config-lock", True, "waiting for another cronward (add, remove or "
+                    "edit) to finish with the config"):
         yield
 
 
 def save(text: str) -> None:
     """Replaces the config atomically. Writes through a symlink, so a config
-    kept in a dotfiles repo stays there."""
-    real = config_path().resolve()
-    files.write_atomic(real, text, real.stat().st_mode & 0o7777)
+    kept in a dotfiles repo stays there, and in the folder read_text checks."""
+    try:
+        folder, name = files.resolve(config_path())
+        with folder:
+            folder.write(name, text, folder.stat(name).st_mode & 0o7777)
+    except files.Unsafe as e:
+        raise ConfigError(f"cronward does not write the config: {e}") from None

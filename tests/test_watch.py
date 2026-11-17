@@ -251,6 +251,12 @@ class BadStatusTest(ViewerTest):
         "a kind that is a list": lambda st: st["jobs"][0]["recent"][0].update(kind=["passed"]),
         "a slot past any date": lambda st: st["jobs"][0]["recent"][0].update(slot=1e300),
         "enabled a string": lambda st: st["jobs"][0].update(enabled="yes"),
+        "a job name with markup": lambda st: st["jobs"][0].update(name="<b>check</b>"),
+        "a repo that is no repo": lambda st: st["jobs"][0].update(repo="me/widget\nfixed"),
+        "a link elsewhere": lambda st: st["jobs"][0]["recent"][0].update(
+            url="https://github.com.example.org/x"),
+        "a link with a space": lambda st: st["jobs"][0]["recent"][0].update(
+            url="https://github.com/me/widget passed"),
     }
 
     def bad_status(self, how):

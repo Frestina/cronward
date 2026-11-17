@@ -6,7 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from cronward import __version__, cli, config, state, status, tokens
+from cronward import __version__, cli, config, notify, state, status, tokens
 from tests.harness import EXPIRES, JOB, REPO, CronwardTest, at
 
 
@@ -70,7 +70,7 @@ class CliTest(CronwardTest):
     def test_token_set_replaces_the_old_tokens_expiry(self):
         self.config()
         state.path().parent.mkdir(parents=True, exist_ok=True)
-        state.write_json(state.path(), {**state.empty(), "accounts": {
+        state.write_json(state.STATE, {**state.empty(), "accounts": {
             "personal": {"expires": "2026-11-01 00:00:00 UTC", "warned": "2026-11-01"}}})
         self.run_cli("token", "set", "personal", stdin="github_pat_new\n")
         self.assertEqual(state.load()["accounts"]["personal"], {"expires": EXPIRES})
@@ -131,7 +131,7 @@ class CliTest(CronwardTest):
     def test_token_remove_undoes_token_set(self):
         self.config()
         state.path().parent.mkdir(parents=True, exist_ok=True)
-        state.write_json(state.path(), state.empty())
+        state.write_json(state.STATE, state.empty())
         before = config.config_path().read_bytes()
         self.run_cli("token", "set", "work", stdin="github_pat_work\n")
         self.assertIn("work", state.load()["accounts"])
@@ -429,6 +429,11 @@ class CliTest(CronwardTest):
         self.assertNotIn("\x1b", out)
         self.assertNotIn("\x07", out)
         self.assertIn("failure", out)
+
+    def test_clean_takes_out_what_reorders_or_hides_text(self):
+        self.assertEqual(notify.clean("pass\u202eliaf\u2066x\u2069\u200b\ufeffed"),
+                         "passliafxed")
+        self.assertEqual(notify.clean("Blåbær ok"), "Blåbær ok")
 
     def test_history_of_a_job_with_no_results_and_of_no_job(self):
         self.config()

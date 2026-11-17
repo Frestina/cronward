@@ -112,11 +112,15 @@ def run(make: MakeClient = default_client) -> int:
                "set. Fine if a viewer watches it (cronward install --viewer HOST on your "
                "laptop); otherwise set notify.command in the config")
 
-    if config.state_dir().exists():
-        try:
-            files.check_private(config.state_dir())
-        except files.Unsafe as e:
-            r.fail(str(e))
+    try:
+        with state.folder(make=False):
+            pass
+    except FileNotFoundError:
+        pass
+    except files.Unsafe as e:
+        r.fail(str(e))
+    if why := tokens.check():
+        r.fail(why)
 
     try:
         tick_state = timers.active(timers.TICK.name)

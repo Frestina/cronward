@@ -12,6 +12,7 @@ on what it fetched before it keeps or shows it.
 """
 
 import datetime
+import re
 import socket
 import time
 
@@ -67,13 +68,22 @@ def build(cfg: Config, data: dict, now: float | None = None) -> dict:
 
 # What a status from another machine must hold before a viewer uses it: the
 # fields build makes and the viewer reads. "?" allows null.
+# Names, repos, workflows and links must be as cronward itself makes them,
+# so what a viewer shows or opens is never more than that.
 _TOP = {"host": "str", "now": "time", "last_tick": "time?", "tick_error": "str?"}
-_JOB = {"name": "str", "account": "str", "repo": "str", "workflow": "str",
+_JOB = {"name": "name", "account": "name", "repo": "repo", "workflow": "workflow",
         "schedule": "str", "timezone": "str", "enabled": "bool", "next": "time?"}
-_RESULT = {"job": "str", "slot": "time", "kind": "kind", "reason": "str",
-           "url": "str??", "finished": "time??", "note": "str??", "manual": "bool??"}
-_ACCOUNT = {"name": "str", "token": "str?", "expires": "str?", "expires_soon": "bool"}
+_RESULT = {"job": "name", "slot": "time", "kind": "kind", "reason": "str",
+           "url": "url??", "finished": "time??", "note": "str??", "manual": "bool??"}
+_ACCOUNT = {"name": "name", "token": "str?", "expires": "str?", "expires_soon": "bool"}
 _LATEST = 1e11  # past this, a time is no date Python can show
+_PATTERNS = {"name": config.NAME, "repo": config.REPO, "workflow": config.WORKFLOW,
+             "url": re.compile(r"https://github\.com/[A-Za-z0-9._~/%?=&#+-]*")}
+
+
+def link(url: object) -> str | None:
+    """A run's address from GitHub, kept only when it is a plain github.com one."""
+    return url if isinstance(url, str) and _PATTERNS["url"].fullmatch(url) else None
 
 
 def _ok(value: object, kind: str) -> bool:
@@ -85,6 +95,8 @@ def _ok(value: object, kind: str) -> bool:
                 and 0 <= value < _LATEST)  # also refuses NaN
     if kind == "kind":
         return isinstance(value, str) and value in WORDS
+    if kind in _PATTERNS:
+        return isinstance(value, str) and _PATTERNS[kind].fullmatch(value) is not None
     return isinstance(value, {"str": str, "bool": bool}[kind])
 
 
@@ -126,7 +138,7 @@ def check(st: object) -> None:
 
 
 def write(cfg: Config, data: dict) -> None:
-    state.write_json(state.status_path(), build(cfg, data))
+    state.write_json(state.STATUS, build(cfg, data))
 
 
 def refresh() -> None:
@@ -135,9 +147,9 @@ def refresh() -> None:
     not the last tick's jobs. Only when there is one: a main machine that has
     never ticked keeps saying so. A config or state that does not read is
     left to the next tick, which says why."""
-    if not state.status_path().exists():
-        return
     try:
+        if not state.exists(state.STATUS):
+            return
         cfg = config.load()
         with state.locked(wait=True):
             write(cfg, state.load())

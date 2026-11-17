@@ -356,6 +356,19 @@ class NoticeTest(CronwardTest):
         self.assertEqual(st["jobs"][0]["latest"]["kind"], "passed")
         status.check(st)
 
+    def test_a_run_link_that_is_not_github_com_is_not_kept(self):
+        cfg = self.config()
+        self.tick(cfg, "2026-11-03 05:56")
+        self.tick(cfg, "2026-11-03 06:01")
+        self.gh.runs[1001]["html_url"] = "https://evil.example/actions/runs/1001"
+        self.gh.finish(1001, "success")
+        self.tick(cfg, "2026-11-03 06:06")
+        latest = state.latest(state.load(), "check")
+        self.assertEqual(latest["kind"], "passed")
+        self.assertEqual(latest["url"], "https://github.com/me/widget/actions/runs/1001")
+        self.assertIsNone(status.link("https://evil.example/x"))
+        self.assertIsNone(status.link("https://github.com/x y"))
+
 
 class _NoCall:
     expires = None

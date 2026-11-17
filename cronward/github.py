@@ -1,6 +1,7 @@
 """The only code that talks to GitHub, and only to api.github.com.
 
-The address is fixed here, and a redirect to any other host is refused.
+The address is fixed here, and a redirect anywhere else, or to plain http, is
+refused, as the token would go with it.
 Tests replace the transport, never the address.
 
 Errors say whether the request may have reached GitHub, because a start
@@ -61,8 +62,10 @@ class HTTPProblem(GitHubError):
 
 
 class _SameHost(urllib.request.HTTPRedirectHandler):
+    # The token goes with a redirect, so only to the same address, over https.
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if urllib.parse.urlsplit(newurl).hostname != HOST:
+        url = urllib.parse.urlsplit(newurl)
+        if url.scheme != "https" or url.hostname != HOST or url.port not in (None, 443):
             raise urllib.error.HTTPError(newurl, code, f"refused redirect to {newurl}",
                                          headers, fp)
         return super().redirect_request(req, fp, code, msg, headers, newurl)

@@ -13,8 +13,9 @@ behaviour, and change it in the same commit when a decision changes.
 - `cronward/github.py`: the only code that talks to GitHub.
 - `cronward/tokens.py`: tokens, encrypted with systemd-creds.
 - `cronward/state.py`: state.json, its lock and the result records.
-- `cronward/files.py`: writing a file, opening a lock and checking the state
-  folder, so a planted name or symlink leads nowhere. Write through it.
+- `cronward/files.py`: opening a folder by walking its path with each folder
+  and symlink checked, then reading and writing only through that open
+  folder, so a planted name or symlink leads nowhere. Go through it.
 - `cronward/tick.py`: a tick: claim, start, follow. The core.
 - `cronward/notify.py`: when to give a notice, giving it, and the viewer.
 - `cronward/status.py`: `status` and status.json.

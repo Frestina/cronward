@@ -48,7 +48,8 @@ Only `success` is passed. Nothing unknown is ever shown as passed.
 3. **Code from a repo runs on the machine.** cronward starts runs on
    GitHub's machines. It is not a runner and runs nothing from a repo.
 4. **cronward talks to a host other than api.github.com.** The address is
-   fixed in the code and a redirect elsewhere is refused. The only other
+   fixed in the code, and a redirect elsewhere, or to plain http, is
+   refused, as the token would go with it. The only other
    traffic is what the user configures: `notify.command`, and a viewer's
    ssh to the main machine (`watch`, and `--on`).
 5. **A token is written into the config or a log.**
@@ -59,6 +60,13 @@ Only `success` is passed. Nothing unknown is ever shown as passed.
 writes a commented example, and nothing when anything is at that path, a
 symlink too, even one to a file that is not there. Unknown keys are errors,
 so a typo is caught.
+
+The config decides what runs on the machine (`notify.command`), so it is
+read only when the file, the folder it really is in, and every folder and
+symlink on the way belong to the user or root and no one else can write to
+them, as for the state folder (below). A config kept in a dotfiles repo
+through a symlink is fine. One that fails is not read: each command says
+why, and a tick gives a notice.
 
 `cronward add` adds a job, and `cronward remove` takes one out. Both change
 the file's text, so its comments stay, write through a symlink, and read the
@@ -120,7 +128,9 @@ GitHub, and stores it under `~/.local/share/cronward/tokens/`
 dotfiles. With `systemd-creds` (systemd 256 or newer) it is encrypted with
 `--user`, bound to this machine and user. Without it, it is a plain file
 only the user can read, in a folder only the user can open, never readable
-by others even for a moment. That is the case on Ubuntu 24.04 and Debian
+by others even for a moment. `systemd-creds` gets the token and gives the
+credential back on stdin and stdout, so cronward alone writes and reads the
+files, through the checked folder. That is the case on Ubuntu 24.04 and Debian
 12, likely home servers, so it is said loudly: the README says it before
 the install, `token set` prints a warning with the reason (such as the
 systemd version) and what to do, and `doctor` warns on every run while a
@@ -225,13 +235,31 @@ fixed or moved away. Moving it away starts every job afresh from that tick.
 
 The state, status.json, the locks and a viewer's copies are kept in
 `~/.local/state/cronward`, a folder only the user can write to. When it
-belongs to someone else, or others can write to it, cronward uses nothing in
-it: each command says so and what to do, a tick gives a notice, and `doctor`
-fails. Every file cronward replaces (the state, status.json, the config, the
-units, a token) goes to a new temp file with a unique name next to it, then
-is renamed into place, and a lock is opened without truncating it or
-following a symlink. So a name planted in a folder never leads a write to
-another file.
+belongs to someone else, others can write to it, or it is a symlink,
+cronward uses nothing in it: each command says so and what to do, a tick
+gives a notice, and `doctor` fails. The same holds for the token folder.
+
+Whoever can change a folder on the way to one of cronward's decides where
+the path leads, so cronward opens each folder it uses (the state, the
+tokens, the config's, the units') by walking its path from `/` one name at
+a time, as ssh's StrictModes does: every folder on the way, and every
+symlink, must belong to the user or root, and no one else may be able to
+write to it. Two exceptions: a sticky folder such as `/tmp`, where no one
+can replace what is not theirs, and a folder of the user's that only its
+group can write to, when the user is that group's only member (a user
+private group). A symlink on the way is followed, and where it leads is
+checked the same way. A folder that fails is named, with the fix
+(`chmod go-w`), and `doctor` fails.
+
+A folder is checked once, when it is opened, and every file in it is then
+reached through that open folder, never by its path again, so a folder
+swapped for a symlink after the check changes nothing. While a command holds
+the state's lock, everything in the state folder goes through the folder it
+took the lock in. Every file cronward replaces (the state, status.json, the
+config, the units, a token) goes to a new temp file with a random name next
+to it, then is renamed into place; a lock is opened without truncating it;
+and no file is read or written through a symlink, except the config itself.
+So a name planted in a folder never leads a read or a write to another file.
 
 `cronward history <job> [--json]` shows those results, newest first, one
 line each: the slot, the result, why, and the run's URL; a run still
@@ -299,7 +327,10 @@ The minute keeps clear of the hour and the quarter hours, where other
 timers crowd, so they don't ssh into the same machine at once.
 
 The main machine is another machine, so the viewer checks what it fetched
-before it keeps it: the schema, and each field it reads, with its type. A
+before it keeps it: the schema, and each field it reads, with its type.
+Job and account names, repos and workflows must be as the config allows
+them, and a run's URL must be a plain `https://github.com/` one (the main
+machine keeps no other), so what a viewer shows or opens is never more. A
 status that fails is told as not reading, like an unreachable machine, and
 the last good copy stays. `status --host` checks the copy again when it
 reads it, and says so, with exit 2, when it does not read.

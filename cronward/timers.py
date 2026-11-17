@@ -14,10 +14,12 @@ and never turns it on itself.
 Every unit starts with MARK, so uninstall takes away only what install wrote.
 """
 
+import contextlib
 import os
 import string
 import subprocess
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -91,13 +93,28 @@ def units(t: Timer) -> dict[str, str]:
     }
 
 
-def ours(path: Path) -> bool:
-    if path.is_symlink():
+@contextlib.contextmanager
+def _units(make: bool = False) -> Iterator[files.Folder | None]:
+    """The unit folder, open and checked, or None when it is not there: systemd
+    runs what is in it, so cronward does not write there when others could."""
+    try:
+        d = files.open_folder(unit_dir(), make=make)
+    except FileNotFoundError:
+        yield None
+        return
+    except files.Unsafe as e:
+        raise TimersError(str(e)) from None
+    with d:
+        yield d
+
+
+def _ours(d: files.Folder | None, name: str) -> bool:
+    if d is None:
         return False
     try:
-        with open(path) as f:
-            return f.readline().rstrip("\n") == MARK
-    except (OSError, UnicodeDecodeError):
+        with d.open(name) as f:
+            return f.readline().decode().rstrip("\n") == MARK
+    except (OSError, UnicodeDecodeError, files.Unsafe):
         return False
 
 
@@ -139,14 +156,13 @@ def install(viewer: str | None = None) -> int:
     t = watch_timer(viewer) if viewer else TICK
     texts = units(t)
     where = unit_dir()
-    for name in texts:
-        path = where / name
-        if (path.exists() or path.is_symlink()) and not ours(path):
-            raise TimersError(f"{path} is there and cronward did not write it; "
-                              "nothing was installed")
-    where.mkdir(parents=True, exist_ok=True)
-    for name, text in texts.items():
-        files.write_atomic(where / name, text, 0o644)
+    with _units(make=True) as d:
+        for name in texts:
+            if d.exists(name) and not _ours(d, name):
+                raise TimersError(f"{where / name} is there and cronward did not write it; "
+                                  "nothing was installed")
+        for name, text in texts.items():
+            d.write(name, text, 0o644)
     _systemctl("daemon-reload")
     _systemctl("enable", "--now", f"{t.name}.timer")
     print(f"installed {t.name}.timer: {t.what} ({'; '.join(t.schedule)})")
@@ -162,9 +178,9 @@ def install(viewer: str | None = None) -> int:
 
 
 def installed() -> list[str]:
-    where = unit_dir()
     names = [f"{n}.{ext}" for n in NAMES for ext in ("service", "timer")]
-    return [n for n in names if ours(where / n)]
+    with _units() as d:
+        return [n for n in names if _ours(d, n)]
 
 
 def uninstall() -> int:
@@ -172,9 +188,10 @@ def uninstall() -> int:
     mine = installed()
     if timers := [n for n in mine if n.endswith(".timer")]:
         _systemctl("disable", "--now", *timers)
-    for name in mine:
-        (where / name).unlink()
-        print(f"removed {where / name}")
+    with _units() as d:
+        for name in mine:
+            d.unlink(name)
+            print(f"removed {where / name}")
     if mine:
         _systemctl("daemon-reload")
         print("config, tokens and state are left; delete them by hand to remove everything")
@@ -186,6 +203,7 @@ def uninstall() -> int:
 def active(name: str) -> str | None:
     """The timer's ActiveState, or None when cronward did not install it. Raises
     TimersError when systemd cannot say."""
-    if not ours(unit_dir() / f"{name}.timer"):
-        return None
+    with _units() as d:
+        if not _ours(d, f"{name}.timer"):
+            return None
     return _systemctl("show", "--property=ActiveState", "--value", f"{name}.timer").strip()

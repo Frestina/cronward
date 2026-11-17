@@ -40,7 +40,11 @@ SSH = ("ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
        "-o", "ForwardAgent=no", "-o", "IdentityAgent=none", "-o", "ClearAllForwardings=yes")
 REMOTE = 'cat -- "${XDG_STATE_HOME:-$HOME/.local/state}/cronward/status.json"'
 OFFLINE = ("Network is unreachable", "Temporary failure in name resolution")
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+# Control characters, and the invisible ones that reorder or hide text
+# (bidirectional overrides and isolates, zero-width characters), with which a
+# repo's text could make a notice or a line read as something else.
+_CONTROL = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200b-\u200f\u202a-\u202e"
+                      "\u2060-\u2069\ufeff]")
 
 
 def clean(text: object) -> str:
@@ -171,13 +175,18 @@ def _safe(host: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.@-]", "_", host)
 
 
-def _viewer_path(host: str):
-    return config.state_dir() / f"viewer-{_safe(host)}.json"
+def _viewer_name(host: str) -> str:
+    return f"viewer-{_safe(host)}.json"
+
+
+def copy_name(host: str) -> str:
+    """The file in the state folder where a viewer keeps the main machine's
+    status it last fetched."""
+    return f"status-{_safe(host)}.json"
 
 
 def copy_path(host: str):
-    """Where a viewer keeps the main machine's status it last fetched."""
-    return config.state_dir() / f"status-{_safe(host)}.json"
+    return config.state_dir() / copy_name(host)
 
 
 class NoCopy(Exception):
@@ -194,12 +203,14 @@ def copy(host: str) -> dict:
     """The status `watch host` last fetched, plus a viewer object saying how
     fresh it is: {"host", "fetched", "error", "offline", "unreachable_since",
     "stopped_ticking"}. NoCopy when there is none."""
+    name = copy_name(host)
     path = copy_path(host)
     v = _load_viewer(host) or {}
     try:
-        st = json.loads(path.read_text())
-        status.check(st)
-        fetched = v.get("fetched") or path.stat().st_mtime
+        with state.folder(make=False) as d:
+            st = json.loads(d.read(name))
+            status.check(st)
+            fetched = v.get("fetched") or d.stat(name).st_mtime
     except FileNotFoundError:
         tried = f" (last try: {clean(v['error'])})" if v.get("error") else ""
         raise NoCopy(f"no status from {host} yet{tried}: it is fetched hourly at :08, or now "
@@ -217,7 +228,7 @@ def copy(host: str) -> dict:
 
 def _load_viewer(host: str) -> dict | None:
     try:
-        return json.loads(_viewer_path(host).read_text())
+        return json.loads(state.read_text(_viewer_name(host)))
     except (OSError, ValueError):
         return None
 
@@ -232,7 +243,7 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
         st = fetch(host)
     except Offline as e:
         v.update(offline=True, error=str(e))
-        state.write_json(_viewer_path(host), v)
+        state.write_json(_viewer_name(host), v)
         print(f"{e}; trying again later", file=sys.stderr)
         return 0
     except Unreachable as e:
@@ -244,12 +255,12 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
             v["unreachable_said"] = True
             notices.append({"title": f"cronward: cannot reach {host}",
                             "body": f"{e}. Its jobs may not be starting.", "kind": "host"})
-        state.write_json(_viewer_path(host), v)
+        state.write_json(_viewer_name(host), v)
         send(notices, cfg)
         print(e, file=sys.stderr)
         return 1
 
-    state.write_json(copy_path(host), st)
+    state.write_json(copy_name(host), st)
     v["fetched"] = now
     v.pop("offline", None)
     v.pop("error", None)
@@ -290,6 +301,6 @@ def watch(host: str, cfg: Config, now: float | None = None) -> int:
             finished += [r for r, k in zip(final, keys) if k not in old]
         v["seen"][name] = keys
     notices += changes(v["notified"], finished, jobs)
-    state.write_json(_viewer_path(host), v)
+    state.write_json(_viewer_name(host), v)
     send(notices, cfg)
     return 0

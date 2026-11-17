@@ -49,8 +49,10 @@ def default_path() -> Path:
 def settings(path: Path) -> dict[str, str]:
     """NTFY_TOPIC, NTFY_SERVER and, when set, NTFY_TOKEN from the file."""
     try:
-        mode = path.stat().st_mode
-        text = path.read_text()
+        # One open: the mode checked is that of the file read.
+        with open(path, "rb") as f:
+            mode = os.fstat(f.fileno()).st_mode
+            text = f.read().decode(errors="replace")
     except FileNotFoundError:
         raise Problem(f"no {path}; write it with NTFY_TOPIC=... and chmod 600 it") from None
     except OSError as e:

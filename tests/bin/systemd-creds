@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A fake systemd-creds: "encrypts" by writing FAKECRED, the --name, and the
-# text reversed, and decrypts only with the same --name. With
+# text reversed, and decrypts only with the same --name. INPUT and OUTPUT
+# may be "-", stdin and stdout, as cronward passes them. With
 # $CW_CREDS=fail it fails to encrypt. $CW_SYSTEMD is its systemd version
 # (default 262); before 256 it has no --user, as the real one.
 set -uo pipefail
@@ -24,16 +25,20 @@ for a in "$@"; do
     *) args+=("$a") ;;
   esac
 done
+in=${args[1]:--}
+out=${args[2]:--}
+[[ $in == - ]] && in=/dev/stdin
+[[ $out == - ]] && out=/dev/stdout
 case ${args[0]} in
   encrypt)
     if [[ ${CW_CREDS:-ok} == fail ]]; then
       echo "Failed to determine local credential key" >&2
       exit 1
     fi
-    { echo "FAKECRED $name"; rev; } >"${args[2]}"
+    { echo "FAKECRED $name"; rev <"$in"; } >"$out"
     ;;
   decrypt)
     { read -r magic stored && [[ $magic == FAKECRED && $stored == "$name" ]] &&
-      rev; } <"${args[1]}" || { echo "Credential name mismatch" >&2; exit 1; }
+      rev; } <"$in" >"$out" || { echo "Credential name mismatch" >&2; exit 1; }
     ;;
 esac

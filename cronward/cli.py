@@ -118,9 +118,9 @@ def parser() -> argparse.ArgumentParser:
 
 def cmd_init() -> int:
     path = config.config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        files.create_new(path, config.TEMPLATE)
+        with files.open_folder(path.parent, make=True) as folder:
+            folder.create(path.name, config.TEMPLATE)
     except FileExistsError:
         if path.is_symlink() and not path.exists():
             print(f"{path} is a symlink to {os.readlink(path)}, which is not there; nothing "
@@ -143,7 +143,7 @@ def cmd_token(action: str, account: str) -> int:
     if action == "remove":
         print(f"removed the token for {account}" if tokens.remove(account)
               else f"no token stored for {account}")
-        if state.path().exists():
+        if state.exists(state.STATE):
             # Its expiry would otherwise warn about a token that is gone.
             with state.locked(wait=True):
                 data = state.load()
@@ -190,7 +190,7 @@ def cmd_token(action: str, account: str) -> int:
               file=sys.stderr)
         return EXIT_ERROR
     how, why = tokens.store(account, token)
-    if state.path().exists():
+    if state.exists(state.STATE):
         # The old token's expiry would otherwise warn until a tick reaches GitHub.
         with state.locked(wait=True):
             data = state.load()
@@ -219,7 +219,7 @@ def _add_account(account: str) -> str | None:
     path = config.config_path()
     with config.editing():
         try:
-            text = path.read_text()
+            text = config.read_text()
         except FileNotFoundError:
             return (f"note: there is no config at {path}, so no [accounts.{account}] in it; "
                     "write one with: cronward init")
@@ -236,7 +236,7 @@ def _remove_account(account: str) -> str | None:
     path = config.config_path()
     with config.editing():
         try:
-            text = path.read_text()
+            text = config.read_text()
         except FileNotFoundError:
             return None
         cfg = config.parse(text, str(path))
@@ -450,7 +450,7 @@ def cmd_add(a: argparse.Namespace) -> int:
 def _add(a: argparse.Namespace) -> int:
     path = config.config_path()
     try:
-        text = path.read_text()
+        text = config.read_text()
     except FileNotFoundError:
         raise ConfigError(f"no config at {path}; write one with: cronward init") from None
     cfg = config.parse(text, str(path))
@@ -507,7 +507,7 @@ def cmd_remove(name: str) -> int:
     path = config.config_path()
     with config.editing():
         try:
-            text = path.read_text()
+            text = config.read_text()
         except FileNotFoundError:
             raise ConfigError(f"no config at {path}") from None
         config.parse(text, str(path)).job(name)
