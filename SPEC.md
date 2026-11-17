@@ -321,7 +321,18 @@ The viewer keeps its own record of what it has said, and says:
 - **The main machine stopped ticking**: its last tick is more than 30
   minutes old, once, and again when ticks come back.
 - **The main machine can't be reached**: after 30 minutes, once, and again
-  when it is back. When the viewer itself is offline it says nothing.
+  when it is back. When the viewer itself is offline it says nothing, and
+  tries again at the next watch.
+
+The viewer is offline when ssh finds the network unreachable or cannot
+look up the name, or when ssh does not get through and the viewer has no
+default route but through a VPN (`tailscale*`, `wg*`, `tun*`). Just after
+waking from sleep the VPN's interface is up before Wi-Fi is, so ssh to its
+address times out rather than finds the network unreachable. A connect that
+times out while the viewer has a route out is tried once more after 30
+seconds, for the time between Wi-Fi coming back and the VPN reconnecting.
+Only a second timeout counts as the main machine not reached. Both tries
+fit the watch unit's 2 minutes.
 
 The minute keeps clear of the hour and the quarter hours, where other
 timers crowd, so they don't ssh into the same machine at once.

@@ -2,8 +2,9 @@
 
 CronwardTest gives every test its own HOME with no XDG variables, puts
 tests/bin first on the PATH (fakes of notify-send, systemctl, loginctl,
-systemd-creds and ssh that record their calls), and a FakeGitHub that a
-test passes to cronward as its transport.
+systemd-creds and ssh that record their calls), a default route through
+wlan0 that `routes` changes, and a FakeGitHub that a test passes to
+cronward as its transport.
 
     class MyTest(CronwardTest):
         def test_something(self):
@@ -23,7 +24,7 @@ import urllib.parse
 from pathlib import Path
 from unittest import mock
 
-from cronward import config, github, tick
+from cronward import config, github, notify, tick
 from cronward.config import Config
 
 BIN = Path(__file__).resolve().parent / "bin"
@@ -177,6 +178,20 @@ class CronwardTest(unittest.TestCase):
         sleep = mock.patch.object(github.Client, "__init__", _no_sleep_init(self.gh))
         sleep.start()
         self.addCleanup(sleep.stop)
+        for name, value in (("ROUTES", (str(self.root / "route"), str(self.root / "ipv6_route"))),
+                            ("RETRY", 0)):
+            patch = mock.patch.object(notify, name, value)
+            patch.start()
+            self.addCleanup(patch.stop)
+        self.routes("wlan0")
+
+    def routes(self, *ifaces: str) -> None:
+        """This machine's IPv4 default routes, through these interfaces, and
+        no IPv6 ones: what notify.has_route reads."""
+        lines = ["Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT"]
+        lines += [f"{i}\t00000000\t0101A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0" for i in ifaces]
+        (self.root / "route").write_text("\n".join(lines) + "\n")
+        (self.root / "ipv6_route").write_text("")
 
     def config(self, text: str = JOB) -> Config:
         path = config.config_path()

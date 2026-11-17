@@ -40,6 +40,16 @@ SSH = ("ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
        "-o", "ForwardAgent=no", "-o", "IdentityAgent=none", "-o", "ClearAllForwardings=yes")
 REMOTE = 'cat -- "${XDG_STATE_HOME:-$HOME/.local/state}/cronward/status.json"'
 OFFLINE = ("Network is unreachable", "Temporary failure in name resolution")
+# A connect that times out is tried once more after RETRY seconds: the time
+# between Wi-Fi coming back after sleep and a VPN reconnecting. About
+# 10 + 30 + 10 s, and at most 30 + 30 + 30 s: within the watch unit's
+# TimeoutStartSec=2min.
+RETRY = 30
+# The kernel's routing tables, IPv4 then IPv6 (all tables), and the
+# interfaces that are a VPN's, not a way out of their own.
+ROUTES = ("/proc/net/route", "/proc/net/ipv6_route")
+VPN = re.compile(r"tailscale|wg|tun")
+RTF_UP, RTF_REJECT = 0x0001, 0x0200
 # Control characters, and the invisible ones that reorder or hide text
 # (bidirectional overrides and isolates, zero-width characters), with which a
 # repo's text could make a notice or a line read as something else.
@@ -143,8 +153,46 @@ class Offline(Exception):
     pass
 
 
-def fetch(host: str) -> dict:
-    """The main machine's status, over one ssh call."""
+class _NotReached(Unreachable):
+    """ssh did not get through to the host. timed_out: its connect timed out."""
+
+    def __init__(self, text: str, timed_out: bool = False):
+        super().__init__(text)
+        self.timed_out = timed_out
+
+
+def has_route() -> bool:
+    """Whether this machine has a default route other than through a VPN.
+    A VPN such as Tailscale keeps its interface, and the routes to its
+    addresses, while Wi-Fi is down, as just after waking from sleep: ssh to
+    such an address then times out rather than finds the network
+    unreachable. When the routes cannot be read, it says yes."""
+    found = False
+    for path, ipv6 in ((ROUTES[0], False), (ROUTES[1], True)):
+        try:
+            with open(path) as f:
+                lines = f.read().splitlines()
+        except OSError:
+            continue
+        found = True
+        for line in lines if ipv6 else lines[1:]:
+            f = line.split()
+            try:
+                if ipv6:
+                    default = len(f) >= 10 and set(f[0]) == {"0"} and f[1] == "00"
+                    iface, flags = f[9], int(f[8], 16)
+                else:
+                    default = len(f) >= 8 and f[1] == f[7] == "00000000"
+                    iface, flags = f[0], int(f[3], 16)
+            except ValueError:
+                continue
+            if (default and flags & RTF_UP and not flags & RTF_REJECT and iface != "lo"
+                    and not VPN.match(iface)):
+                return True
+    return not found
+
+
+def _fetch_once(host: str) -> dict:
     argv = [*SSH, "--", host, REMOTE]
     try:
         done = remote.call(argv, timeout=TIMEOUT, stdin=subprocess.DEVNULL,
@@ -152,13 +200,13 @@ def fetch(host: str) -> dict:
     except OSError as e:
         raise Unreachable(f"cannot run ssh: {e.strerror}") from None
     except subprocess.TimeoutExpired:
-        raise Unreachable(f"{host} gave no answer in {TIMEOUT}s") from None
+        raise _NotReached(f"{host} gave no answer in {TIMEOUT}s") from None
     err = done.stderr.decode(errors="replace").strip().splitlines()
     last = clean(err[-1]) if err else f"exit {done.returncode}"
     if done.returncode == 255:
         if any(o in last for o in OFFLINE):
             raise Offline(f"this machine is offline: {last}")
-        raise Unreachable(f"cannot reach {host}: {last}")
+        raise _NotReached(f"cannot reach {host}: {last}", timed_out="timed out" in last)
     if done.returncode != 0:
         if "No such file" in last:
             raise Unreachable(f"{host} has no cronward status: it has never ticked there")
@@ -169,6 +217,24 @@ def fetch(host: str) -> dict:
     except ValueError as e:
         raise Unreachable(f"the status on {host} does not read: {clean(e)}") from None
     return data
+
+
+def fetch(host: str) -> dict:
+    """The main machine's status, over one ssh call, or two when the first
+    one's connect times out. Not getting through with no default route but a
+    VPN's is Offline, not Unreachable."""
+    for again in (False, True):
+        try:
+            return _fetch_once(host)
+        except _NotReached as e:
+            if not has_route():
+                raise Offline(f"this machine is offline: it has no default route but a "
+                              f"VPN's ({e})") from None
+            if again or not e.timed_out:
+                raise
+            print(f"{e}; trying again in {RETRY}s", file=sys.stderr)
+            time.sleep(RETRY)
+    raise AssertionError("unreachable")
 
 
 def _safe(host: str) -> str:

@@ -105,6 +105,69 @@ class WatchTest(ViewerTest):
             rc, titles = self.watch(NOW + minutes * 60)
             self.assertEqual((rc, titles), (0, []))
 
+    def time_out(self, times):
+        (self.root / "timeouts").mkdir(exist_ok=True)
+        (self.root / "timeouts" / "anvil").write_text(f"{times}\n")
+
+    def viewer(self):
+        return json.loads(state.read_text("viewer-anvil.json"))
+
+    def test_a_timeout_with_no_route_but_a_vpn_is_offline(self):
+        self.main_status([rec("2026-11-03 06:00", "passed")])
+        for ifaces in (("tailscale0",), ("wg0", "tun1"), ()):
+            with self.subTest(ifaces):
+                self.routes(*ifaces)
+                self.time_out(1)
+                self.assertEqual(self.watch(), (0, []))
+                v = self.viewer()
+                self.assertTrue(v["offline"])
+                self.assertNotIn("unreachable_since", v)
+                self.assertIn("no default route but a VPN's", v["error"])
+                self.assertIn("Connection timed out", v["error"])
+        self.assertEqual(len(self.calls("ssh")), 3)  # no second try
+
+    def test_a_timeout_then_an_answer_is_a_normal_fetch(self):
+        self.main_status([rec("2026-11-03 06:00", "failed")])
+        self.time_out(1)
+        err = StringIO()
+        with redirect_stderr(err):
+            rc = notify.watch("anvil", config.Config(), now=NOW)
+        self.assertEqual(rc, 0)
+        self.assertIn("Connection timed out; trying again in 0s", err.getvalue())
+        self.assertEqual(len(self.calls("ssh")), 2)
+        self.assertEqual([c[-2] for c in self.calls("notify-send")], ["cronward: check failed"])
+        v = self.viewer()
+        self.assertEqual(v["fetched"], NOW)
+        self.assertFalse({"error", "offline", "unreachable_since"} & set(v))
+
+    def test_two_timeouts_are_unreachable(self):
+        self.main_status([])
+        self.time_out(2)
+        self.assertEqual(self.watch(), (1, []))
+        self.assertEqual(len(self.calls("ssh")), 2)
+        v = self.viewer()
+        self.assertEqual(v["unreachable_since"], NOW)
+        self.assertNotIn("offline", v)
+        self.assertEqual(v["error"], "cannot reach anvil: ssh: connect to host anvil port 22: "
+                                     "Connection timed out")
+
+    def test_the_second_try_waits(self):
+        self.main_status([])
+        self.time_out(1)
+        with mock.patch.object(notify, "RETRY", 0.5):
+            start = time.monotonic()
+            self.assertEqual(self.watch()[0], 0)
+        self.assertGreaterEqual(time.monotonic() - start, 0.5)
+
+    def test_other_failures_are_not_tried_again(self):
+        self.assertEqual(self.watch()[0], 1)  # anvil has no home: no route to host
+        self.assertEqual(len(self.calls("ssh")), 1)
+
+    def test_no_route_to_the_host_with_no_route_out_is_offline(self):
+        self.routes("tailscale0")
+        self.assertEqual(self.watch(), (0, []))
+        self.assertTrue(self.viewer()["offline"])
+
     def test_control_characters_from_the_far_side_are_dropped(self):
         self.main_status([rec("2026-11-03 06:00", "failed", "bad\x1b[31m news")])
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
@@ -118,6 +181,42 @@ class WatchTest(ViewerTest):
         self.main_status([rec("2026-11-01 06:00", "failed"), rec("2026-11-02 06:00", "passed"),
                           rec("2026-11-03 06:00", "failed")])
         self.assertEqual(self.watch()[1], ["cronward: check failed"])
+
+
+class RouteTest(CronwardTest):
+    """notify.has_route, from the kernel's tables."""
+
+    V6 = ("00000000000000000000000000000000 00 00000000000000000000000000000000 00 "
+          "fe800000000000000000000000000001 00000400 00000001 00000000 {flags} {iface}\n")
+
+    def v6(self, *routes):
+        (self.root / "ipv6_route").write_text(
+            "".join(self.V6.format(flags=f, iface=i) for f, i in routes))
+
+    def test_ipv4(self):
+        self.assertTrue(notify.has_route())
+        self.routes("tailscale0", "wg0", "tun0")
+        self.assertFalse(notify.has_route())
+        self.routes("tailscale0", "enp3s0")
+        self.assertTrue(notify.has_route())
+
+    def test_ipv6(self):
+        self.routes()
+        self.v6(("00200200", "lo"), ("00000003", "tailscale0"), ("00000002", "wlan0"))
+        self.assertFalse(notify.has_route())  # a reject, a VPN, and one not up
+        self.v6(("00200200", "lo"), ("00000003", "wlan0"))
+        self.assertTrue(notify.has_route())
+
+    def test_a_route_to_somewhere_is_not_a_default(self):
+        (self.root / "route").write_text(
+            "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\n"
+            "wlan0\t0001A8C0\t00000000\t0001\t0\t0\t600\t00FFFFFF\n")
+        self.assertFalse(notify.has_route())
+
+    def test_tables_that_do_not_read_say_yes(self):
+        (self.root / "route").unlink()
+        (self.root / "ipv6_route").unlink()
+        self.assertTrue(notify.has_route())
 
 
 class StatusHostTest(ViewerTest):
