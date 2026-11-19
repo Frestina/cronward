@@ -11,7 +11,10 @@ ssh: a widget calls cronward, never ssh itself.
 Only cronward runs on the far side: the command name is checked against
 cronward's own commands first, and the arguments are quoted for the far
 side's shell. It runs ~/.local/bin/cronward, else cronward on the PATH
-there. The exit code is passed through; ssh's own failure (255) is 2.
+there, but only one that gives its version and is FAR_NEEDS or newer, as
+an older one may write unsafely; the line saying so is a fixed one that a
+widget can match. The exit code is passed through; ssh's own failure (255)
+and a refused cronward are 2.
 
 Time limits: ssh gives up on a connection after 10 s, and on one that
 stops answering after about 30 s (ServerAlive). Beyond that --on waits for
@@ -33,13 +36,35 @@ import sys
 import time
 
 NOT_FOUND = 127
+# The far side's cronward was too old, or gave no version, and the command
+# was not run. A code cronward never returns, as NOT_FOUND.
+TOO_OLD = 125
+# The first cronward whose writes are safe (#52, #53). An older one on the far
+# side is not run: a viewer that was updated cannot tell what is there.
+FAR_NEEDS = (0, 2, 2)
 # A connection that stops answering after login fails in about 30 s, not when
 # TCP keepalive gives up two hours later. ssh's own failure, 255.
 ALIVE = ("-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3")
 SIGNALS = (signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
 GRACE = 5  # seconds between TERM and KILL
+# The line ssh runs on the far side: find cronward, ask its version, refuse
+# one older than FAR_NEEDS or with no version, else run the command; all in
+# the one session, as some setups allow only a few connections in a while.
+# The version is printed only once it is digits and dots, of at most 6 digits
+# each. Splitting with ${r%%.*}, not IFS, so a zsh login shell reads it alike.
 FIND = ('c="$HOME/.local/bin/cronward"; [ -x "$c" ] || c="$(command -v cronward)" || '
-        'exit {code}; exec "$c" {args}')
+        'exit {code}; '
+        'v="$("$c" --version 2>/dev/null)" || v=; v="${{v#cronward }}"; '
+        'case "$v" in ""|.*|*.|*..*|*[!0-9.]*|*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) v= ;; esac; '
+        'new=; if [ -n "$v" ]; then new=1; r="$v."; for n in {fields}; do '
+        'x="${{r%%.*}}"; r="${{r#*.}}"; x="${{x:-0}}"; '
+        'if [ "$x" -gt "$n" ]; then break; elif [ "$x" -lt "$n" ]; then new=; break; fi; '
+        'done; fi; '
+        'if [ -z "$new" ]; then if [ -n "$v" ]; then '
+        "printf 'cronward: cronward on %s is %s, older than {needs}: update it there\\n' {host} \"$v\" >&2; "
+        "else printf 'cronward: cronward on %s gives no version, so may be older than {needs}: "
+        "update it there\\n' {host} >&2; fi; exit {old}; fi; "
+        'exec "$c" {args}')
 
 
 class RemoteError(Exception):
@@ -172,7 +197,9 @@ def command(host: str, args: list[str], commands: tuple[str, ...], tty: bool) ->
     if args[0] not in commands:
         raise RemoteError(f"{args[0]!r} is not a cronward command; --on runs only cronward's "
                           f"own: {', '.join(commands)}")
-    remote = FIND.format(code=NOT_FOUND, args=shlex.join(args))
+    remote = FIND.format(code=NOT_FOUND, old=TOO_OLD, host=shlex.quote(host),
+                         needs=".".join(map(str, FAR_NEEDS)),
+                         fields=" ".join(map(str, FAR_NEEDS)), args=shlex.join(args))
     how = ["-t"] if tty else ["-T", "-o", "BatchMode=yes"]
     return ["ssh", *how, "-o", "ConnectTimeout=10", *ALIVE, "--", host, remote]
 
@@ -195,6 +222,8 @@ def run(host: str, args: list[str], commands: tuple[str, ...]) -> int:
     if code == NOT_FOUND:
         print(f"cronward: not installed on {host}: no ~/.local/bin/cronward, and no cronward "
               "on the PATH there", file=sys.stderr)
+        return 2
+    if code == TOO_OLD:  # the far side said which, above
         return 2
     if code < 0:
         return 2

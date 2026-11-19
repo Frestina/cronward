@@ -377,9 +377,18 @@ Only cronward runs on the far side: the command name is checked against
 cronward's own commands first, the host may not start with `-`, and the
 arguments are quoted for the far side's shell (a POSIX shell, as for
 `watch`). It runs `~/.local/bin/cronward`, else `cronward` on the PATH
-there, and says so when neither is there. The exit code is passed through;
-ssh's own failure (255) is 2. Output is passed through as it comes: the far
-side is cronward, which cleans what it prints.
+there, and says so when neither is there. In the same ssh session, with no
+second connection (some setups allow only a few in a short time), it first
+asks that cronward's `--version`, and runs nothing when it is older than
+0.2.2, the first whose writes are safe, or gives no version: a viewer that
+was updated cannot otherwise tell that the main machine was not. Then it
+says, in one fixed line a widget can match, `cronward: cronward on <host>
+is 0.2.1, older than 0.2.2: update it there`, or `cronward: cronward on
+<host> gives no version, so may be older than 0.2.2: update it there`, and
+exits 2. A version is only printed when it is digits and dots. A key with a
+forced command ignores this line, so the status-only key is unaffected. The
+exit code is passed through; ssh's own failure (255) is 2. Output is passed
+through as it comes: the far side is cronward, which cleans what it prints.
 
 Time limits: ssh gives up connecting after 10 seconds, and on a connection
 that stops answering after about 30 (`ServerAliveInterval=10`,
@@ -436,8 +445,8 @@ the main machine cannot be reached or has stopped ticking (status), the
 start did not go through or with `--wait` the run did not pass (run),
 GitHub's check refused the job (add), a check failed (doctor), or the main
 machine was not reached (watch), 2 an error. With `--on`, the far side's
-code, or 2 when ssh failed, or 128 plus the signal when cronward was
-stopped.
+code, or 2 when ssh failed or the cronward there is too old, or 128 plus
+the signal when cronward was stopped.
 
 ## Agents
 

@@ -3,6 +3,7 @@ on both sides. Only commands that never talk to GitHub run on the far side."""
 
 import io
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -28,6 +29,20 @@ class RemoteTest(HangTest):
             (home / ".config/cronward").mkdir(parents=True)
             (home / ".config/cronward/config.toml").write_text(config)
         home.mkdir(parents=True, exist_ok=True)
+        return home
+
+    def far(self, version: str, code: int = 0) -> Path:
+        """anvil with a fake cronward that gives version for --version, and
+        notes in ~/ran any command it is given instead."""
+        shutil.rmtree(self.root / "homes" / "anvil", ignore_errors=True)
+        home = self.anvil(installed=False)
+        (home / ".local/bin").mkdir(parents=True)
+        fake = home / ".local/bin/cronward"
+        fake.write_text('#!/bin/sh\nif [ "$1" = --version ]; then printf "%s" "$VERSION"; '
+                        f'exit {code}; fi\necho "$@" >>"$HOME/ran"\n')
+        fake.chmod(0o755)
+        self.addCleanup(os.environ.pop, "VERSION", None)
+        os.environ["VERSION"] = version
         return home
 
     def on(self, *argv):
@@ -88,6 +103,61 @@ class RemoteTest(HangTest):
             rc, _, err = self.on("--on", "anvil", "status")
         self.assertEqual(rc, 2)
         self.assertIn("cronward: not installed on anvil: no ~/.local/bin/cronward", err)
+
+    def test_a_far_side_older_than_it_needs_is_not_run(self):
+        none = "gives no version, so may be older than 0.2.2"
+        for version, said in (("cronward 0.2.1\n", "is 0.2.1, older than 0.2.2"),
+                              ("cronward 0.1.9.9\n", "is 0.1.9.9, older than 0.2.2"),
+                              ("", none), ("usage: cronward\n", none),
+                              ("cronward 0.2.2-dev\n", none),
+                              ("cronward 0.2.2\n\x1b]0;pwned\x07\n", none),
+                              ("cronward 99999999.0.0\n", none),
+                              ("cronward $(touch pwned)\n", none)):
+            with self.subTest(version=version):
+                home = self.far(version)
+                rc, out, err = self.on("--on", "anvil", "remove", "check")
+                self.assertEqual(rc, 2, err)
+                self.assertEqual(out, "")
+                self.assertEqual(err, f"cronward: cronward on anvil {said}: update it there\n")
+                self.assertFalse((home / "ran").exists())
+                self.assertFalse((home / "pwned").exists())
+        self.assertEqual(len(self.calls("ssh")), 8)  # one connection each
+
+    def test_a_version_that_fails_is_none(self):
+        home = self.far("cronward 0.2.2\n", code=1)
+        rc, _, err = self.on("--on", "anvil", "status")
+        self.assertEqual(rc, 2)
+        self.assertIn("gives no version", err)
+        self.assertFalse((home / "ran").exists())
+
+    def test_a_far_side_new_enough_is_run(self):
+        for version in ("cronward 0.2.2\n", "cronward 0.2.10\n", "cronward 0.3\n",
+                        "cronward 1.0.0\n", "cronward 0.2.2.1"):
+            with self.subTest(version=version):
+                home = self.far(version)
+                rc, _, err = self.on("--on", "anvil", "remove", "check")
+                self.assertEqual(rc, 0, err)
+                self.assertEqual((home / "ran").read_text(), "remove check\n")
+
+    def test_the_check_reads_alike_in_other_shells(self):
+        # The far side's login shell runs the line; zsh does not split on IFS.
+        for shell in ("sh", "dash", "zsh"):
+            path = shutil.which(shell)
+            if not path:
+                continue
+            for version, rc in (("cronward 0.2.1", remote.TOO_OLD), ("cronward 0.2.10", 0),
+                                ("junk", remote.TOO_OLD)):
+                with self.subTest(shell=shell, version=version):
+                    home = self.far(version)
+                    line = remote.command("anvil", ["status"], COMMANDS, tty=False)[-1]
+                    done = subprocess.run([path, "-c", line], env={**os.environ, "HOME": str(home)},
+                                          capture_output=True, text=True)
+                    self.assertEqual(done.returncode, rc, done.stderr)
+                    self.assertEqual((home / "ran").exists(), rc == 0)
+
+    def test_the_refused_code_is_none_cronward_gives(self):
+        self.assertNotIn(remote.TOO_OLD, (0, 1, 2, remote.NOT_FOUND, 126, 255))
+        self.assertLess(remote.TOO_OLD, 128)
 
     def test_a_host_that_cannot_be_reached(self):
         rc, _, err = self.on("--on", "nowhere", "status")

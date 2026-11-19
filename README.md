@@ -321,7 +321,8 @@ first: `cronward --on homeserver add ...`, `cronward --on homeserver token
 set personal`, `cronward --on homeserver edit`. That is your normal ssh,
 with your keys and agent, so it needs a login on the server that can run
 commands, not only the viewer's read of the status. It runs only cronward
-there.
+there, and only one that is 0.2.2 or newer: update cronward on the server
+too when you update it on the laptop.
 
 A connection that drops fails within about 30 seconds. Otherwise `--on`
 waits for the server, so a script that wants a deadline can wrap it, as in

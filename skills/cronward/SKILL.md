@@ -42,7 +42,9 @@ Jobs live on the main machine, which holds the config and the tokens. Run
    passes the exit code through; 2 with "ssh failed" means ssh could not
    log in (no key, a passphrase), and "this key only reads the status"
    means ssh logged in with the viewer's read-only key. Then ask the user
-   to run the commands, or to make ssh to `<host>` work for you.
+   to run the commands, or to make ssh to `<host>` work for you. A line
+   ending "update it there" means the cronward on `<host>` is too old to
+   run anything: ask the user to update it there.
 3. Otherwise cronward is not set up for this user. Tell them, point them to
    the install steps in cronward's README, and stop.
 

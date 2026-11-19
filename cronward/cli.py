@@ -27,7 +27,8 @@ main machine cannot be reached or has stopped ticking (status), the start
 did not go through or with --wait the run did not pass (run), GitHub's check
 refused the job (add), a check failed (doctor) or the main machine was not
 reached (watch), 2 an error. With --on, the far side's exit code, or 2 when
-ssh failed, or 128 plus the signal when cronward was stopped.
+ssh failed or HOST's cronward is older than 0.2.2, or 128 plus the signal
+when cronward was stopped.
 
 --on gives up on a connection that stops answering after about 30 s, and
 otherwise waits for HOST. Stopped (SIGTERM, SIGHUP, SIGINT), cronward stops
